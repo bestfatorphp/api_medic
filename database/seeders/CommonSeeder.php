@@ -214,7 +214,7 @@ class CommonSeeder extends Seeder
             foreach (range(1, 10) as $index) {
                 UnisenderParticipation::create([
                     'campaign_id' => $campaign->id,
-                    'email' => $contactsEmails[array_rand($contactsEmails)],
+                    'email' => $faker->randomElement($contactsEmails),
                     'result' => $faker->boolean ? 'yes' : 'no',
                     'update_time' => $faker->dateTime,
                 ]);

@@ -38,7 +38,7 @@ class UnisenderParticipation extends Model
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function campaign()
+    public function unisender_campaign()
     {
         return $this->belongsTo(UnisenderCampaign::class, 'campaign_id');
     }
