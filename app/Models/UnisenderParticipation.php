@@ -28,14 +28,16 @@ class UnisenderParticipation extends Model
     protected $guarded = ['id'];
 
     /**
+     * Unisender контакт
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function unisender_participations()
+    public function unisender_contact()
     {
         return $this->belongsTo(UnisenderContact::class, 'email', 'email');
     }
 
     /**
+     * Unisender рассылка
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function unisender_campaign()
