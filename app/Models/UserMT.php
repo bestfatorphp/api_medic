@@ -5,6 +5,8 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Пользователи MT
@@ -30,6 +32,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string         $uf_utm_term            utm метка
  * @property string         $uf_utm_campaign        utm метка
  * @property string         $uf_utm_content         utm метка
+ * @property mixed          $common_database        Общая база
+ * @property mixed          $actions_mt             Действия МТ
  */
 class UserMT extends Model
 {
@@ -48,18 +52,18 @@ class UserMT extends Model
 
     /**
      * Действия МТ
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
-    public function actions_mt()
+    public function actions_mt(): HasMany
     {
         return $this->hasMany(ActionMT::class, 'mt_user_id');
     }
 
     /**
      * Общая база
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * @return HasOne
      */
-    public function common_database()
+    public function common_database(): HasOne
     {
         return $this->hasOne(CommonDatabase::class, 'email', 'email');
     }

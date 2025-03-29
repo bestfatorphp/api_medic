@@ -15,7 +15,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // $schedule->command('inspire')->hourly();
+        $schedule->command('bitrix:medtouch-csv --chunk=5 --timeout=120')->dailyAt('02:00');
+        $schedule->command('import:telegram-users')->dailyAt('01:00');
     }
 
     /**

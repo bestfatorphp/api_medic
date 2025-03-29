@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Doctor;
+use App\Http\Controllers\PrivateFileController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,3 +18,6 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+Route::middleware('private.disk')->get('/private/{path}', [PrivateFileController::class, 'streamFile'])
+    ->where('path', '.*');

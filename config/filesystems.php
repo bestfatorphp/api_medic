@@ -42,6 +42,14 @@ return [
             'visibility' => 'public',
         ],
 
+        'private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'visibility' => 'private',
+            'throw' => true,
+            'url' => env('APP_URL').'/api/private', //добавляем URL для доступа через маршрут
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

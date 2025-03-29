@@ -44,24 +44,24 @@ class CreateMedicTables extends Migration
         //Пользователи MT
         Schema::create('users_mt', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('full_name')->comment('ФИО');
+            $table->string('full_name')->nullable()->comment('ФИО');
             $table->string('email')->unique()->comment('E-mail');
-            $table->string('gender')->comment('Пол');
-            $table->date('birth_date')->comment('Дата рождения');
-            $table->string('specialty')->comment('Специальность');
-            $table->string('interests')->comment('Интересы');
-            $table->string('phone')->comment('Телефон');
-            $table->string('place_of_employment')->comment('Место работы');
-            $table->date('registration_date')->comment('Дата регистрации');
-            $table->string('country')->comment('Страна');
-            $table->string('region')->comment('Регион');
-            $table->string('city')->comment('Город');
-            $table->string('registration_website')->comment('Сайт регистрации');
-            $table->string('acquisition_tool')->comment('Инструммент привлечения');
-            $table->string('acquisition_method')->comment('Способ привлечения');
-            $table->string('uf_utm_term')->comment('utm метка');
-            $table->string('uf_utm_campaign')->comment('utm метка');
-            $table->string('uf_utm_content')->comment('utm метка');
+            $table->string('gender')->nullable()->comment('Пол');
+            $table->date('birth_date')->nullable()->comment('Дата рождения');
+            $table->string('specialty')->nullable()->comment('Специальность');
+            $table->string('interests')->nullable()->comment('Интересы');
+            $table->string('phone')->nullable()->comment('Телефон');
+            $table->string('place_of_employment')->nullable()->comment('Место работы');
+            $table->date('registration_date')->nullable()->comment('Дата регистрации');
+            $table->string('country')->nullable()->comment('Страна');
+            $table->string('region')->nullable()->comment('Регион');
+            $table->string('city')->nullable()->comment('Город');
+            $table->string('registration_website')->nullable()->comment('Сайт регистрации');
+            $table->string('acquisition_tool')->nullable()->comment('Инструммент привлечения');
+            $table->string('acquisition_method')->nullable()->comment('Способ привлечения');
+            $table->string('uf_utm_term')->nullable()->comment('utm метка');
+            $table->string('uf_utm_campaign')->nullable()->comment('utm метка');
+            $table->string('uf_utm_content')->nullable()->comment('utm метка');
         });
 
         //Действия МТ
@@ -113,25 +113,27 @@ class CreateMedicTables extends Migration
         Schema::create('common_database', function (Blueprint $table) {
             $table->increments('id');
             $table->string('email')->unique()->comment('E-mail');
-            $table->string('full_name')->comment('ФИО');
-            $table->string('city')->comment('Город');
-            $table->string('region')->comment('Регион');
-            $table->string('country')->comment('Страна');
-            $table->string('specialty')->comment('Специальность');
-            $table->string('interests')->comment('Интересы');
-            $table->string('phone')->comment('Телефон');
+            $table->string('full_name')->nullable()->comment('ФИО');
+            $table->string('city')->nullable()->comment('Город');
+            $table->string('region')->nullable()->comment('Регион');
+            $table->string('country')->nullable()->comment('Страна');
+            $table->string('specialty')->nullable()->comment('Специальность');
+            $table->string('interests')->nullable()->comment('Интересы');
+            $table->string('phone')->nullable()->comment('Телефон');
             $table->unsignedInteger('mt_user_id')->unique()->comment('ID полльзователя MT');
-            $table->dateTime('registration_date')->comment('Дата регистрации');
-            $table->string('gender')->comment('Пол');
-            $table->dateTime('birth_date')->comment('Дата рождения');
-            $table->string('registration_website')->comment('Сайт регистрации');
-            $table->string('acquisition_tool')->comment('Инструмент привлечения');
-            $table->string('acquisition_method')->comment('Способ привлечения');
-            $table->integer('planned_actions')->comment('Запланированные действия');
+            $table->dateTime('registration_date')->nullable()->comment('Дата регистрации');
+            $table->string('gender')->nullable()->comment('Пол');
+            $table->dateTime('birth_date')->nullable()->comment('Дата рождения');
+            $table->string('registration_website')->nullable()->comment('Сайт регистрации');
+            $table->string('acquisition_tool')->nullable()->comment('Инструмент привлечения');
+            $table->string('acquisition_method')->nullable()->comment('Способ привлечения');
+            $table->string('username')->nullable()->comment('Никнэйм');
+            $table->string('specialization')->nullable()->comment('Название чатов в которых состоит пользователь');
+            $table->integer('planned_actions')->nullable()->comment('Запланированные действия');
             $table->integer('resulting_actions')->nullable()->comment('Результативные действия');
-            $table->string('verification_status')->comment('Статус верификации');
-            $table->boolean('pharma')->comment('Фарма');
-            $table->string('email_status')->comment('Статус e-mail');
+            $table->string('verification_status')->nullable()->comment('Статус верификации');
+            $table->boolean('pharma')->default(false)->comment('Фарма');
+            $table->string('email_status')->nullable()->comment('Статус e-mail');
         });
 
         //Парсинг PD

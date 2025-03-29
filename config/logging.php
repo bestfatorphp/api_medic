@@ -67,6 +67,15 @@ return [
             'days' => 14,
         ],
 
+        'commands' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/commands/command.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30, //хранение логов за 30 дней
+            'permission' => 0664, //права на файлы
+            'tap' => [App\Logging\CustomLog::class],
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
