@@ -81,6 +81,8 @@ class ImportMedTouchHeliosFile extends Command
         if (!Storage::exists(self::HTML_DUMP_PATH)) {
             Storage::makeDirectory(self::HTML_DUMP_PATH);
         }
+        //установка лимита памяти
+        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
     }
 
     /**
