@@ -98,7 +98,7 @@ class CreateMedicTables extends Migration
             $table->integer('clicked')->nullable()->comment('Количество кликов');
             $table->integer('clicks_per_unique')->nullable()->comment('Количество уникальных кликов');
             $table->float('ctor')->nullable()->comment('Число переходов по ссылкам из писем/число открытых в процентах');
-            $table->boolean('statistics_received')->default(false)->comment('Статсистика по компании была получена');
+            $table->boolean('statistics_received')->default(false)->comment('Статсистика по кампании была получена');
         });
 
         //Unisender участия

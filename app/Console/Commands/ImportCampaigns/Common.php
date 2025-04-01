@@ -26,7 +26,7 @@ class Common extends Command
      *
      * @var string
      */
-    protected $description = 'Общий класс для команд импорта компаний';
+    protected $description = 'Общий класс для команд импорта кампаний';
 
     /**
      * Статистика кампании не была собрана основной командой по какой-то причине.
@@ -74,13 +74,13 @@ class Common extends Command
 
         if (!$this->isBad) {
 
-            //пропускаем обработанные completed компании
+            //пропускаем обработанные completed кампании
             if ($campaignDB && $campaignDB->statistics_received) {
                 return;
             }
 
             if (!$campaignDB) {
-                //получаем общую статистику компании
+                //получаем общую статистику кампании
                 $campaignCommonStats = UniSender::getCampaignCommonStats($campaignId);
 
                 $campaignCommonStats = $campaignCommonStats['result'];
@@ -131,7 +131,7 @@ class Common extends Command
         } catch (\Exception $e) {
             $this->error("Ошибка при обработке CSV-файла для кампании #{$campaign['id']}");
             Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
-            throw $e; //перебрасываем исключение для сохранения ID кампании в файл
+            throw $e;
         }
     }
 
@@ -152,6 +152,10 @@ class Common extends Command
             if (!isset($taskStatus['result']['status'])) {
                 $this->error("Ошибка при проверке статуса задачи (Task UUID: {$taskUuid})");
                 return null;
+            }
+            if (isset($taskStatus['result']['task_type']) && $taskStatus['result']['task_type'] !== 'campaign_delivery_stats') {
+                $this->error("Задача не относится к получению статистики по кампании (Task UUID: {$taskUuid})");
+                continue;
             }
 
             $status = $taskStatus['result']['status'];
@@ -277,7 +281,7 @@ class Common extends Command
                 } catch (\Exception $e) {
                     $this->error("Ошибка при получении данных для email {$email}");
                     Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
-                    continue; // Пропускаем email, если произошла ошибка
+                    continue; //пропускаем email, если произошла ошибка
                 }
 
                 //обновляем прогресс-бар
