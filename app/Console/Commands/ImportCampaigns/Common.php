@@ -3,6 +3,7 @@
 namespace App\Console\Commands\ImportCampaigns;
 
 use App\Facades\UniSender;
+use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
 use App\Models\UnisenderCampaign;
 use App\Models\UnisenderContact;
@@ -129,6 +130,7 @@ class Common extends Command
             });
         } catch (\Exception $e) {
             $this->error("Ошибка при обработке CSV-файла для кампании #{$campaign['id']}");
+            CustomLog::errorLog(__CLASS__, 'commands', $e);
             throw $e; //перебрасываем исключение для сохранения ID кампании в файл
         }
     }
@@ -269,12 +271,13 @@ class Common extends Command
                         'city' => $contact['fields']['Город'] ?? null,
                         'specialty' => $contact['fields']['специальность'] ?? null,
                         'phone' => $contact['phone']['phone'] ?? null,
-                        'registration_date' => Carbon::now()->format('Y-m-d H:i:s'),
+                        'registration_date' => null,
                         'email_status' => $contact['email']['status'],
                     ];
                 } catch (\Exception $e) {
                     $this->error("Ошибка при получении данных для email {$email}: " . $e->getMessage());
-                    continue; // Пропускаем email, если произошла ошибка
+                    CustomLog::errorLog(__CLASS__, 'commands', $e);
+                    continue;
                 }
 
                 //обновляем прогресс-бар

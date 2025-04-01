@@ -66,9 +66,10 @@ class ImportBadCampaignStatsCommand extends Common
     {
         $campaign = UnisenderCampaign::query()->where('statistics_received', false)->first();
         if (!$campaign) {
+            $this->info("Нет кампаний по которым не получена статистика");
             return;
         }
-        $this->info("Сбор статистики по компании #{$campaign->id}");
+        $this->info("Сбор статистики по кампании #{$campaign->id}");
         $this->processCompletedCampaign($campaign->toArray());
     }
 }
