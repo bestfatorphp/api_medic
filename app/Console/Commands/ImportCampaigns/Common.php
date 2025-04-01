@@ -179,7 +179,7 @@ class Common extends Command
      */
     private function processCsvFile(string $fileUrl, int $campaignId): void
     {
-        $this->tmpFilePath = tempnam(sys_get_temp_dir(), 'unisender_stats_temp_');
+        $this->tmpFilePath = tempnam(sys_get_temp_dir(), $this->tmpFilePath);
         file_put_contents($this->tmpFilePath, fopen($fileUrl, 'r'));
 
         $handle = fopen($this->tmpFilePath, 'r');
