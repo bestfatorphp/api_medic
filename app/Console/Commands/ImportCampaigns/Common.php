@@ -3,13 +3,13 @@
 namespace App\Console\Commands\ImportCampaigns;
 
 use App\Facades\UniSender;
-use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
 use App\Models\UnisenderCampaign;
 use App\Models\UnisenderContact;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\NoReturn;
 
 class Common extends Command
@@ -130,7 +130,7 @@ class Common extends Command
             });
         } catch (\Exception $e) {
             $this->error("Ошибка при обработке CSV-файла для кампании #{$campaign['id']}");
-            CustomLog::errorLog(__CLASS__, 'commands', $e);
+            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             throw $e; //перебрасываем исключение для сохранения ID кампании в файл
         }
     }
@@ -275,9 +275,9 @@ class Common extends Command
                         'email_status' => $contact['email']['status'],
                     ];
                 } catch (\Exception $e) {
-                    $this->error("Ошибка при получении данных для email {$email}: " . $e->getMessage());
-                    CustomLog::errorLog(__CLASS__, 'commands', $e);
-                    continue;
+                    $this->error("Ошибка при получении данных для email {$email}");
+                    Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
+                    continue; // Пропускаем email, если произошла ошибка
                 }
 
                 //обновляем прогресс-бар
