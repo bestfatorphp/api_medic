@@ -110,10 +110,9 @@ class UniSenderService
             $response = Http::timeout($this->timeout)
                 ->retry($this->retryCount, $this->retryDelay)
                 ->asForm()
-                ->post($this->apiUrl, array_merge([
+                ->post($this->apiUrl . $method, array_merge([
                     'format' => 'json',
                     'api_key' => $this->apiKey,
-                    'method' => $method,
                 ], $params));
 
             return $response->throw()->json();
@@ -124,6 +123,29 @@ class UniSenderService
                 $e
             );
         }
+    }
+
+    /**
+     * Получает результат выполнения асинхронной задачи.
+     * Метод универсальный и подходит для методов, где используется подготовка данных.
+     * В параметре возвращается название метода, по которому выполняется подготовка задания.
+     *
+     * @param string $taskUuid Уникальный идентификатор задачи (task_uuid).
+     * @return array [
+     *     'result' => [
+     *         'status' => string,         // Статус рассылки
+     *         'creation_time' => string,  // Дата создания (ГГГГ-ММ-ДД чч:мм:сс)
+     *         'start_time' => string      // Время начала рассылки
+     *     ]
+     * ]
+     *
+     * @throws \Exception
+     */
+    public function getTaskResult(string $taskUuid): array
+    {
+        return $this->callApi('async/getTaskResult', [
+            'task_uuid' => $taskUuid,
+        ]);
     }
 
 
@@ -167,6 +189,7 @@ class UniSenderService
 
     /**
      * Запрашивает статистику доставки email-рассылки (асинхронный метод)
+     * Для получения результата данного метода, запрашивать getTaskResult
      *
      * @param int $campaignId           Идентификатор рассылки (обязательный)
      * @param array $options            Дополнительные параметры:
@@ -1121,8 +1144,8 @@ class UniSenderService
 
         $params = [
             'email' => $email,
-            'include_lists' => isset($options['include_lists']) ? 0 : 1,
-            'include_fields' => isset($options['include_fields']) ? 0 : 1,
+            'include_lists' => isset($options['include_lists']) ? 1 : 0,
+            'include_fields' => isset($options['include_fields']) ? 1 : 0,
             'include_details' => isset($options['include_details']) ? 1 : 0
         ];
 
@@ -2719,7 +2742,7 @@ class UniSenderService
     /**
      * Валидация названия поля importContacts
      */
-    protected function validateFieldImportContacts(string $field): void
+    private function validateFieldImportContacts(string $field): void
     {
         $systemFields = [
             'email', 'phone', 'delete', 'tags',
@@ -2740,7 +2763,7 @@ class UniSenderService
     /**
      * Валидация значения поля importContacts
      */
-    protected function validateFieldValueImportContacts(string $field, $value, int $rowIndex, int $colIndex): void
+    private function validateFieldValueImportContacts(string $field, $value, int $rowIndex, int $colIndex): void
     {
         if ($value === null || $value === '') return;
 

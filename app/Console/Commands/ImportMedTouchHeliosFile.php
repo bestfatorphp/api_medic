@@ -10,13 +10,13 @@ use Symfony\Component\Panther\Client;
 use Throwable;
 
 //todo: Перед использованием, установки на сервере для Panther
-class ParsingBitrixMedTouchFile extends Command
+class ImportMedTouchHeliosFile extends Command
 {
     /**
-     * Пример: php artisan bitrix:medtouch-csv --chunk=5 --timeout=60
+     * Пример: php artisan import:medtouch-helios --chunk=5 --timeout=60
      * @var string
      */
-    protected $signature = 'bitrix:medtouch-csv
+    protected $signature = 'import:medtouch-helios
                             {--chunk=5 : Размер чанка скачивания в MB}
                             {--timeout=120 : Таймаут ожидания в секундах}';
 
@@ -31,37 +31,43 @@ class ParsingBitrixMedTouchFile extends Command
      * Используется для предотвращения переполнения памяти.
      * Назначил: 50 MB
      */
-    const MEMORY_SAFETY_BUFFER = 50 * 1024 * 1024;
+    private const MEMORY_SAFETY_BUFFER = 50 * 1024 * 1024;
 
     /**
      * Максимально допустимая доля использования доступной памяти (от 0 до 1).
      * При превышении этого значения генерируется предупреждение.
      * Назначил: 0.8 (80% от доступной памяти)
      */
-    const MAX_MEMORY_USAGE = 0.8;
+    private const MAX_MEMORY_USAGE = 0.8;
 
     /**
      * Имя csv файла для сохранения экспортированных данных.
      */
-    const TARGET_FILENAME = 'user-helios.csv';
+    private const TARGET_FILENAME = 'user-helios.csv';
 
     /**
      * Путь для хранения экспортированных файлов относительно корня storage.
      * Используем приватную директорию.
      */
-    const STORAGE_PATH = 'private/';
+    private const STORAGE_PATH = 'private/';
 
     /**
      * Путь для сохранения скриншотов ошибок относительно корня storage.
      * Используется для диагностики проблем при работе с браузером.
      */
-    const SCREENSHOT_PATH = 'logs/panther_screenshots/';
+    private const SCREENSHOT_PATH = 'logs/panther_screenshots/';
 
     /**
      * Путь для сохранения HTML-дампов страниц при ошибках относительно корня storage.
      * Используется для анализа структуры страниц при проблемах с парсингом.
      */
-    const HTML_DUMP_PATH = 'logs/panther_html/';
+    private const HTML_DUMP_PATH = 'logs/panther_html/';
+
+    /**
+     * Путь к временному файлу
+     * @var string|bool
+     */
+    private string|bool $tmpFilePath;
 
 
     public function __construct()
@@ -81,7 +87,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Организуем процесс скачивания файла с страницы Медтач гелиос.
      * @return int
      */
-    public function handle()
+    public function handle(): int
     {
         try {
             $this->logMemory('Начало выполнения');
@@ -102,6 +108,11 @@ class ParsingBitrixMedTouchFile extends Command
             Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             $this->error('Ошибка выполнения, смотрите логи');
             return CommandAlias::FAILURE;
+        } finally {
+            //убедимся, что временный файл удален даже в случае ошибки
+            if (isset($this->tmpFilePath) && file_exists($this->tmpFilePath)) {
+                unlink($this->tmpFilePath);
+            }
         }
     }
 
@@ -110,7 +121,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Настраиваем параметры Chrome и случайный User-Agent.
      * @return Client
      */
-    protected function initBrowser(): Client
+    private function initBrowser(): Client
     {
         $this->info("Инициализация headless браузера...");
 
@@ -135,7 +146,7 @@ class ParsingBitrixMedTouchFile extends Command
      * @return string
      * @throws \Exception
      */
-    protected function getTargetUrl(): string
+    private function getTargetUrl(): string
     {
         $url = env('BITRIX_MEDTOUCH_SCRIPT_URL');
         if (empty($url)) {
@@ -152,7 +163,7 @@ class ParsingBitrixMedTouchFile extends Command
      * @return string
      * @throws \Exception
      */
-    protected function extractDownloadUrl(Client $client, string $pageUrl): string
+    private function extractDownloadUrl(Client $client, string $pageUrl): string
     {
         $this->info("Загрузка страницы для получения ссылки...");
         $client->request('GET', $pageUrl);
@@ -192,7 +203,7 @@ class ParsingBitrixMedTouchFile extends Command
      * @return string
      * @throws \Exception
      */
-    protected function waitForDownloadLink(Client $client): string
+    private function waitForDownloadLink(Client $client): string
     {
         $startTime = time();
         $timeout = $this->option('timeout');
@@ -232,7 +243,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Сохраняем отладочную информацию (скриншот, HTML) при ошибках.
      * @param Client $client
      */
-    protected function saveDebugInfo(Client $client): void
+    private function saveDebugInfo(Client $client): void
     {
         try {
             $timestamp = time();
@@ -259,14 +270,14 @@ class ParsingBitrixMedTouchFile extends Command
      * @param string $downloadUrl URL для скачивания файла
      * @throws \Exception
      */
-    protected function downloadAndSave(string $downloadUrl): void
+    private function downloadAndSave(string $downloadUrl): void
     {
         $this->info("Начало скачивания файла...");
         $this->logMemory('Перед скачиванием');
 
         //создаем временный файл для потоковой записи
-        $tmpFilePath = tempnam(sys_get_temp_dir(), 'bitrix_temp_');
-        if ($tmpFilePath === false) {
+        $this->tmpFilePath = tempnam(sys_get_temp_dir(), 'medtouth_temp_');
+        if ($this->tmpFilePath === false) {
             throw new \Exception('Не удалось создать временный файл');
         }
 
@@ -278,7 +289,7 @@ class ParsingBitrixMedTouchFile extends Command
                 throw new \Exception("Не удалось открыть поток для скачивания");
             }
 
-            $dest = fopen($tmpFilePath, 'w');
+            $dest = fopen($this->tmpFilePath, 'w');
             if (!$dest) {
                 throw new \Exception("Не удалось создать временный файл");
             }
@@ -299,11 +310,11 @@ class ParsingBitrixMedTouchFile extends Command
             fclose($source);
             fclose($dest);
 
-            $this->saveToStorage($tmpFilePath);
+            $this->saveToStorage($this->tmpFilePath);
 
         } finally {
-            if (file_exists($tmpFilePath)) {
-                unlink($tmpFilePath);
+            if (file_exists($this->tmpFilePath)) {
+                unlink($this->tmpFilePath);
             }
         }
     }
@@ -312,7 +323,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Сохраняем временный файл в постоянное хранилище.
      * @param string $tempFilePath Путь к временному файлу
      */
-    protected function saveToStorage(string $tempFilePath): void
+    private function saveToStorage(string $tempFilePath): void
     {
         $this->info("Сохранение файла в хранилище...");
 
@@ -329,7 +340,7 @@ class ParsingBitrixMedTouchFile extends Command
     /**
      * Проверяем использование памяти и выводим предупреждения.
      */
-    protected function checkMemoryUsage(): void
+    private function checkMemoryUsage(): void
     {
         $usedMemory = memory_get_usage(true);
         $memoryLimit = $this->getMemoryLimit();
@@ -352,7 +363,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Логируем текущее использование памяти.
      * @param string $message
      */
-    protected function logMemory(string $message): void
+    private function logMemory(string $message): void
     {
         $used = memory_get_usage(true);
         $peak = memory_get_peak_usage(true);
@@ -372,7 +383,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Возвращаем полный путь к сохраненному файлу.
      * @return string
      */
-    protected function getFullStoragePath(): string
+    private function getFullStoragePath(): string
     {
         return storage_path('app/' . self::STORAGE_PATH . self::TARGET_FILENAME);
     }
@@ -381,7 +392,7 @@ class ParsingBitrixMedTouchFile extends Command
      * Получаем лимит памяти в байтах.
      * @return int
      */
-    protected function getMemoryLimit(): int
+    private function getMemoryLimit(): int
     {
         $limit = ini_get('memory_limit');
         if (preg_match('/^(\d+)(.)$/', $limit, $matches)) {
@@ -401,7 +412,7 @@ class ParsingBitrixMedTouchFile extends Command
      * @param int $bytes Размер в байтах
      * @return string
      */
-    protected function formatBytes(int $bytes): string
+    private function formatBytes(int $bytes): string
     {
         $units = ['B', 'KB', 'MB', 'GB'];
         for ($i = 0; $bytes >= 1024 && $i < 3; $i++) {

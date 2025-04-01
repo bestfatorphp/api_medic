@@ -5,8 +5,11 @@ namespace App\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
+ * Общий для асинхронных методов
+ * @method static array getTaskResult(string $taskUuid)                                         Метод подходит для методов, где используется подготовка данных. В параметре возвращается название метода, по которому выполняется подготовка задания.
+ *
  * Методы: получение статистики:
- * @method static array getCampaignCommonStats(int $campaignId)                                 Получает общую статистику по email-рассылки
+ * @method static array getCampaignCommonStats(int $campaignId)                                 Получает общую статистику по email-рассылке
  * @method static array getCampaignDeliveryStats(int $campaignId, array $options = [])          Запрашивает статистику доставки email-рассылки (асинхронный метод)
  * @method static array getCampaignStatus(int $campaignId)                                      Получает текущий статус email-рассылки
  * @method static array getMessages(string $dateFrom, string $dateTo, array $options = [])      Получает список сообщений за указанный период
@@ -72,7 +75,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static array getContactFieldValues(string $email, array|string $fieldIds)                            Получает значения дополнительных полей контакта
  *
  * Вспомогательные методы:
- *  @method static bool checkApiConnection()
+ * @method static bool checkApiConnection()
  *
  * @see \App\Services\UniSenderService
  */

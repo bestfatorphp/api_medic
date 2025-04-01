@@ -24,17 +24,34 @@ use Illuminate\Database\Eloquent\Model;
  * @property integer        $clicked                Количество кликов
  * @property integer        $clicks_per_unique      Количество уникальных кликов
  * @property float          $ctor                   CTOR
+ * @property bool           $statistics_received    Статистика была получена
  *
  */
 class UnisenderCampaign extends Model
 {
     use HasFactory;
 
+    /**
+     * @var string
+     */
     protected $table = 'unisender_campaign';
 
+    /**
+     * @var bool
+     */
     public $timestamps = false;
 
-    protected $guarded = ['id'];
+    /**
+     * @var array
+     */
+    protected $guarded = [];
+
+    /**
+     * @var string[]
+     */
+    protected $casts = [
+        'statistics_received' => 'boolean',
+    ];
 
     protected $with = [
 //        'unisender_participations',

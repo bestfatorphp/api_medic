@@ -18,8 +18,7 @@ class ImportTelegramUsers extends Command
      * @var string
      */
     protected $signature = 'import:telegram-users
-                          {--chunk=1000 : Количество записей за одну транзакцию}
-                          {--memory=128 : Лимит памяти в MB}';
+                          {--chunk=1000 : Количество записей за одну транзакцию}';
 
     /**
      * @var string
@@ -27,12 +26,18 @@ class ImportTelegramUsers extends Command
     protected $description = 'Импорт пользователей с обработкой 1M+ записей в ограниченной памяти';
 
     /**
+     * Путь к временному файлу
+     * @var string|bool
+     */
+    private string|bool $tmpFilePath;
+
+    /**
      * @return int
      */
-    public function handle()
+    public function handle(): int
     {
         //установливаем ограничение по памяти
-        ini_set('memory_limit', $this->option('memory') . 'M');
+        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
 
@@ -50,8 +55,8 @@ class ImportTelegramUsers extends Command
             return CommandAlias::FAILURE;
         } finally {
             //убедимся, что временный файл удален даже в случае ошибки
-            if (isset($tmpFilePath) && file_exists($tmpFilePath)) {
-                unlink($tmpFilePath);
+            if (isset($this->tmpFilePath) && file_exists($this->tmpFilePath)) {
+                unlink($this->tmpFilePath);
             }
         }
     }
@@ -61,16 +66,16 @@ class ImportTelegramUsers extends Command
      * Используем временный файл для хранения данных, чтобы не загружать их в память
      * @throws \Exception
      */
-    protected function processStream()
+    private function processStream()
     {
         //создаем временный файл
-        $tmpFilePath = tempnam(sys_get_temp_dir(), 'telegram_temp_');
-        if ($tmpFilePath === false) {
+        $this->tmpFilePath = tempnam(sys_get_temp_dir(), 'telegram_temp_');
+        if ($this->tmpFilePath === false) {
             throw new \Exception('Не удалось создать временный файл');
         }
 
         //открываем файл для записи
-        $tmpFile = fopen($tmpFilePath, 'w+');
+        $tmpFile = fopen($this->tmpFilePath, 'w+');
         if ($tmpFile === false) {
             throw new \Exception('Не удалось открыть временный файл для записи');
         }
@@ -131,8 +136,8 @@ class ImportTelegramUsers extends Command
         $progressBar->finish();
 
         //удаляем временный файл
-        if (file_exists($tmpFilePath)) {
-            unlink($tmpFilePath);
+        if (file_exists($this->tmpFilePath)) {
+            unlink($this->tmpFilePath);
         }
     }
 
@@ -141,7 +146,7 @@ class ImportTelegramUsers extends Command
      * @param array $batch Пакет данных для обработки
      * @param ProgressBar $progressBar
      */
-    protected function processBatch(array $batch, ProgressBar $progressBar)
+    private function processBatch(array $batch, ProgressBar $progressBar)
     {
         DB::transaction(function () use ($batch) {
             foreach ($batch as $record) {
