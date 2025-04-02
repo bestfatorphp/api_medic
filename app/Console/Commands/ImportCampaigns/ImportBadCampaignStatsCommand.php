@@ -42,10 +42,11 @@ class ImportBadCampaignStatsCommand extends Common
     /**
      * @return int
      */
-    #[NoReturn] public function handle(): int
+    public function handle(): int
     {
         try {
             $this->processAllCampaigns();
+            return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
             Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             $this->error("Ошибка: " . $e->getMessage());

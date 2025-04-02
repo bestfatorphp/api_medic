@@ -28,7 +28,7 @@ class UnisenderContact extends Model
 
     protected $with = [
 //        'common_database',
-//        'unisender_participations',
+        'unisender_participations',
     ];
 
     /**

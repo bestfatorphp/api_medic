@@ -59,6 +59,7 @@ class ImportCampaignStatsCommand extends Common
         try {
             $this->processAllCampaigns($fromDate, $toDate);
             $this->info('Сбор статистики завершен успешно');
+            return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
             Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             $this->error("Ошибка: " . $e->getMessage());
@@ -69,8 +70,6 @@ class ImportCampaignStatsCommand extends Common
                 unlink($this->tmpFilePath);
             }
         }
-
-        return CommandAlias::SUCCESS;
     }
 
     /**

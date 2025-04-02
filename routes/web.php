@@ -20,5 +20,5 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return CommonDatabase::with(['user_mt', 'doctor', 'parsing_pd', 'unisender_contact', 'actions_mt'])->get()->toArray();
+    return CommonDatabase::with(['user_mt', 'doctor', 'parsing_pd', 'unisender_contact', 'actions_mt'])->limit(2)->get()->toArray();
 });

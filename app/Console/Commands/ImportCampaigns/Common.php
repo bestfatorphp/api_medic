@@ -253,7 +253,7 @@ class Common extends Command
             foreach ($emailBatch as $email) {
                 try {
                     $contact = UniSender::getContact($email, [
-                        'include_lists' => false, // Убираем списки
+                        'include_lists' => false, //убираем списки
                         'include_fields' => true,
                         'include_details' => true,
                     ]);
