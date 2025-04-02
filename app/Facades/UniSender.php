@@ -81,8 +81,13 @@ use Illuminate\Support\Facades\Facade;
  */
 class UniSender extends Facade
 {
+    /**
+     * Получение имени сервиса
+     *
+     * @return string
+     */
     protected static function getFacadeAccessor(): string
     {
-        return \App\Services\UniSenderService::class;
+        return 'uni-sender';
     }
 }
