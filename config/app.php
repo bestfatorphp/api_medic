@@ -230,8 +230,9 @@ return [
         'URL' => Illuminate\Support\Facades\URL::class,
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
-        'UniSender' => App\Facades\UniSender::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+        'UniSender' => App\Facades\UniSender::class,
+        'IntellectDialog' => App\Facades\IntellectDialog::class,
     ],
 
 ];

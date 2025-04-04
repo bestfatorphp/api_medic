@@ -5,6 +5,8 @@ namespace App\Services;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * Сервис для работы с API UniSender
@@ -175,15 +177,19 @@ class UniSenderService
      */
     public function getCampaignCommonStats(int $campaignId): array
     {
-        if ($campaignId <= 0) {
-            throw new \InvalidArgumentException('campaignId должен быть положительным числом');
+        $validator = Validator::make(
+            ['campaign_id' => $campaignId],
+            [
+                'campaign_id' => ['required', 'integer', 'min:1'],
+            ]);
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        $params = [
+        return $this->callApi('getCampaignCommonStats', [
             'campaign_id' => $campaignId,
-        ];
-
-        return $this->callApi('getCampaignCommonStats', $params);
+        ]);
     }
 
 
@@ -209,23 +215,27 @@ class UniSenderService
      */
     public function getCampaignDeliveryStats(int $campaignId, array $options = []): array
     {
-        if ($campaignId <= 0) {
-            throw new \InvalidArgumentException('campaignId должен быть положительным числом');
+        $validator = Validator::make(
+            ['campaign_id' => $campaignId] + $options,
+            [
+                'campaign_id' => ['required', 'integer', 'min:1'],
+                'notify_url' => ['nullable', 'url'],
+                'changed_since' => ['nullable', 'date_format:Y-m-d H:i:s'],
+                'field_ids' => ['nullable', 'array'],
+                'field_ids.*' => ['nullable', 'integer', 'min:1'],
+            ]);
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = ['campaign_id' => $campaignId];
 
         if (isset($options['notify_url'])) {
-            if (!filter_var($options['notify_url'], FILTER_VALIDATE_URL)) {
-                throw new \InvalidArgumentException('Некорректный notify_url для уведомления');
-            }
             $params['notify_url'] = $options['notify_url'];
         }
 
         if (isset($options['changed_since'])) {
-            if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $options['changed_since'])) {
-                throw new \InvalidArgumentException("changed_since должна быть в формате 'ГГГГ-ММ-ДД чч:мм:сс'");
-            }
             $params['changed_since'] = $options['changed_since'];
         }
 
@@ -267,23 +277,27 @@ class UniSenderService
      */
     public function getCampaignStatus(int $campaignId): array
     {
-        if ($campaignId <= 0) {
-            throw new \InvalidArgumentException('campaignId должен быть положительным числом');
+        $validator = Validator::make(
+            ['campaign_id' => $campaignId],
+            [
+                'campaign_id' => ['required', 'integer', 'min:1'],
+            ]);
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        $params = [
+        return $this->callApi('getCampaignStatus', [
             'campaign_id' => $campaignId
-        ];
-
-        return $this->callApi('getCampaignStatus', $params);
+        ]);
     }
 
 
     /**
      * Получает список сообщений за указанный период
      *
-     * @param string $dateFrom      Начальная дата периода в формате 'YYYY-MM-DD HH:MM' (UTC, обязательно)
-     * @param string $dateTo        Конечная дата периода в формате 'YYYY-MM-DD HH:MM' (UTC, обязательно)
+     * @param string $dateFrom      Начальная дата периода в формате 'Y-m-d H:i' (UTC, обязательно)
+     * @param string $dateTo        Конечная дата периода в формате 'Y-m-d H:i' (UTC, обязательно)
      * @param array $options        Дополнительные параметры:
      *     - 'format' => string         Формат вывода (json|html), по умолчанию 'json'
      *     - 'limit' => int             Лимит записей (1-100), по умолчанию 50
@@ -315,13 +329,21 @@ class UniSenderService
      */
     public function getMessages(string $dateFrom, string $dateTo, array $options = []): array
     {
-        if (empty($dateFrom) || empty($dateTo)) {
-            throw new \InvalidArgumentException('Даты начала и конца периода обязательны');
-        }
+        $validator = Validator::make(
+            [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ] + $options,
+            [
+                'date_from' => ['required', 'date_format:Y-m-d H:i'],
+                'date_to' => ['required', 'date_format:Y-m-d H:i'],
+                'format' => ['nullable', 'in:json,html'],
+                'limit' => ['nullable', 'integer', 'between:1,100'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]);
 
-        $datePattern = '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/';
-        if (!preg_match($datePattern, $dateFrom) || !preg_match($datePattern, $dateTo)) {
-            throw new \InvalidArgumentException("Даты должны быть в формате 'YYYY-MM-DD HH:MM'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -330,27 +352,15 @@ class UniSenderService
         ];
 
         if (isset($options['format'])) {
-            $format = strtolower($options['format']);
-            if (!in_array($format, ['json', 'html'])) {
-                throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
-            }
-            $params['format'] = $format;
+            $params['format'] = strtolower($options['format']);
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 100) {
-                throw new \InvalidArgumentException('limit должен быть от 1 до 100');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('offset не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('getMessages', $params);
@@ -377,16 +387,21 @@ class UniSenderService
      */
     public function getVisitedLinks(int $campaignId, bool $group = true): array
     {
-        if ($campaignId <= 0) {
-            throw new \InvalidArgumentException('campaignId должен быть положительным числом');
+        $validator = Validator::make(
+            ['campaign_id' => $campaignId, 'group' => $group],
+            [
+                'campaign_id' => ['required', 'integer', 'min:1'],
+                'group' => ['nullable', 'boolean'],
+            ]);
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        $params = [
+        return $this->callApi('getVisitedLinks', [
             'campaign_id' => $campaignId,
             'group' => $group ? 1 : 0,
-        ];
-
-        return $this->callApi('getVisitedLinks', $params);
+        ]);
     }
 
 
@@ -425,13 +440,21 @@ class UniSenderService
      */
     public function listMessages(string $dateFrom, string $dateTo, array $options = []): array
     {
-        if (empty($dateFrom) || empty($dateTo)) {
-            throw new \InvalidArgumentException('Даты начала и конца периода обязательны');
-        }
+        $validator = Validator::make(
+            [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ] + $options,
+            [
+                'date_from' => ['required', 'date_format:Y-m-d H:i'],
+                'date_to' => ['required', 'date_format:Y-m-d H:i'],
+                'format' => ['nullable', 'in:json,html'],
+                'limit' => ['nullable', 'integer', 'between:1,100'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]);
 
-        $datePattern = '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/';
-        if (!preg_match($datePattern, $dateFrom) || !preg_match($datePattern, $dateTo)) {
-            throw new \InvalidArgumentException("Даты должны быть в формате 'ГГГГ-ММ-ДД чч:мм'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -440,27 +463,15 @@ class UniSenderService
         ];
 
         if (isset($options['format'])) {
-            $format = strtolower($options['format']);
-            if (!in_array($format, ['json', 'html'])) {
-                throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
-            }
-            $params['format'] = $format;
+            $params['format'] = strtolower($options['format']);
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 100) {
-                throw new \InvalidArgumentException('limit должен быть от 1 до 100');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('offset не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('listMessages', $params);
@@ -497,33 +508,35 @@ class UniSenderService
      */
     public function getCampaigns(array $options = []): array
     {
+        $validator = Validator::make(
+            $options,
+            [
+                'from' => ['nullable', 'date_format:Y-m-d H:i:s'],
+                'to' => ['nullable', 'date_format:Y-m-d H:i:s'],
+                'limit' => ['nullable', 'integer', 'between:1,10000'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]);
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
+        }
+
         $params = [];
 
-        foreach (['from', 'to'] as $dateField) {
-            if (isset($options[$dateField])) {
-                if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $options[$dateField])) {
-                    throw new \InvalidArgumentException(
-                        "Дата $dateField должна быть в формате 'ГГГГ-ММ-ДД чч:мм:сс'"
-                    );
-                }
-                $params[$dateField] = $options[$dateField];
-            }
+        if (isset($options['from'])) {
+            $params['from'] = $options['from'];
+        }
+
+        if (isset($options['to'])) {
+            $params['to'] = $options['to'];
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 10000) {
-                throw new \InvalidArgumentException('Лимит должен быть в диапазоне 1-10000');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('Смещение не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('getCampaigns', $params);
@@ -561,21 +574,21 @@ class UniSenderService
      */
     public function getMessage(int|array $messageId): array
     {
-        if (empty($messageId)) {
-            throw new \InvalidArgumentException('messageId не может быть пустым');
-        }
-
-        //нормализация ID в массив
         $ids = is_array($messageId) ? $messageId : [$messageId];
 
-        foreach ($ids as $id) {
-            if (!is_numeric($id) || $id <= 0 || $id > 2147483647) { // 2^31-1
-                throw new \InvalidArgumentException('messageId должно быть 31-битным положительным числом');
-            }
+        $validator = Validator::make(
+            ['ids' => $ids],
+            [
+                'ids.*' => ['required', 'integer', 'min:1', 'max:2147483647'], // 31-битное положительное число
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
-            'id' => implode(',', $ids)
+            'id' => implode(',', $ids),
         ];
 
         return $this->callApi('getMessage', $params);
@@ -604,17 +617,27 @@ class UniSenderService
      */
     public function createList(string $title, array $options = []): array
     {
-        $params = [
-            'title' => $title
-        ];
+        $validator = Validator::make(
+            ['title' => $title] + $options,
+            [
+                'title' => ['required', 'string', 'max:255'],
+                'before_subscribe_url' => ['nullable', 'url'],
+                'after_subscribe_url' => ['nullable', 'url'],
+            ]
+        );
 
-        foreach (['before_subscribe_url', 'after_subscribe_url'] as $urlParam) {
-            if (!empty($options[$urlParam])) {
-                if (!filter_var($options[$urlParam], FILTER_VALIDATE_URL)) {
-                    throw new \InvalidArgumentException("Некорректный URL для параметра {$urlParam}");
-                }
-                $params[$urlParam] = $options[$urlParam];
-            }
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
+        }
+
+        $params = ['title' => $title];
+
+        if (!empty($options['before_subscribe_url'])) {
+            $params['before_subscribe_url'] = $options['before_subscribe_url'];
+        }
+
+        if (!empty($options['after_subscribe_url'])) {
+            $params['after_subscribe_url'] = $options['after_subscribe_url'];
         }
 
         return $this->callApi('createList', $params);
@@ -638,15 +661,9 @@ class UniSenderService
      */
     public function deleteList(int $listId): array
     {
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException('ID списка должен быть положительным числом');
-        }
-
-        $params = [
+        return $this->callApi('deleteList', [
             'list_id' => $listId
-        ];
-
-        return $this->callApi('deleteList', $params);
+        ]);
     }
 
     /**
@@ -663,23 +680,33 @@ class UniSenderService
      */
     public function exclude(string $contactType, string $contact, string|array|null $listIds = null): array
     {
-        $errors = [];
+        $validator = Validator::make(
+            [
+                'contact_type' => $contactType,
+                'contact' => $contact,
+            ] + ['list_ids' => $listIds],
+            [
+                'contact_type' => ['required', 'in:email,phone'],
+                'contact' => [
+                    'required',
+                    function ($attribute, $value, $fail) use ($contactType) {
+                        if ($contactType === 'email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                            $fail('Некорректный email формат.');
+                        }
+                    },
+                ],
+                'list_ids' => ['nullable', 'array'],
+                'list_ids.*' => ['nullable', 'integer', 'min:1'],
+            ]
+        );
 
-        if (!in_array($contactType, ['email', 'phone'])) {
-            $errors[] = "contact_type должен быть 'email' или 'phone'";
-        }
-
-        if ($contactType === 'email' && !filter_var($contact, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "Некорректный email формат";
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException(implode('. ', $errors));
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'contact_type' => $contactType,
-            'contact' => $contact
+            'contact' => $contact,
         ];
 
         if ($listIds !== null) {
@@ -713,42 +740,28 @@ class UniSenderService
      */
     public function exportContacts(int $listId, array $fieldNames, array $options = []): array
     {
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException('ID списка должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['list_id' => $listId, 'field_names' => $fieldNames] + $options,
+            [
+                'list_id' => ['required', 'integer', 'min:1'],
+                'field_names' => ['required', 'array', 'min:1'],
+                'field_names.*' => ['required', 'string'], // Каждое поле должно быть строкой
+                'offset' => ['nullable', 'integer', 'min:0'],
+                'limit' => ['nullable', 'integer', 'between:1,5000'],
+                'email_status' => ['nullable', Rule::in(['active', 'inactive', 'unsubscribed', 'blocked', 'invalid'])],
+                'phone_status' => ['nullable', Rule::in(['active', 'inactive', 'unsubscribed', 'blocked', 'invalid'])],
+            ]
+        );
 
-        if (empty($fieldNames)) {
-            throw new \InvalidArgumentException('Не указаны поля для экспорта');
-        }
-
-        $allowedStatuses = ['active', 'inactive', 'unsubscribed', 'blocked', 'invalid'];
-        $errors = [];
-
-        if (isset($options['limit']) && ($options['limit'] < 1 || $options['limit'] > 5000)) {
-            $errors[] = 'Лимит должен быть от 1 до 5000';
-        }
-
-        if (isset($options['offset']) && $options['offset'] < 0) {
-            $errors[] = 'Смещение не может быть отрицательным';
-        }
-
-        if (isset($options['email_status']) && !in_array($options['email_status'], $allowedStatuses)) {
-            $errors[] = 'Недопустимый статус email';
-        }
-
-        if (isset($options['phone_status']) && !in_array($options['phone_status'], $allowedStatuses)) {
-            $errors[] = 'Недопустимый статус телефона';
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException(implode('. ', $errors));
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'list_id' => $listId,
             'field_names' => implode(',', $fieldNames),
             'offset' => $options['offset'] ?? 0,
-            'limit' => $options['limit'] ?? 100
+            'limit' => $options['limit'] ?? 100,
         ];
 
         if (isset($options['email_status'])) {
@@ -783,30 +796,23 @@ class UniSenderService
      */
     public function getContactCount(int $listId, array $params = []): array
     {
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException('listId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['list_id' => $listId, 'params' => $params],
+            [
+                'list_id' => ['required', 'integer', 'min:1'],
+                'params' => ['required', 'array', 'min:1'],
+                'params.tagId' => ['nullable', 'integer', 'min:1'],
+                'params.type' => ['nullable', Rule::in(['address', 'phone'])],
+                'params.search' => ['nullable', 'string', 'min:1', function ($attribute, $value, $fail) use ($params) {
+                    if (isset($params['type']) && empty($value)) {
+                        $fail('search не может быть пустым при указанном type');
+                    }
+                }],
+            ]
+        );
 
-        if (empty($params)) {
-            throw new \InvalidArgumentException('Необходимо указать хотя бы один params фильтрации');
-        }
-
-        $errors = [];
-
-        if (isset($params['tagId']) && !is_numeric($params['tagId'])) {
-            $errors[] = 'tagId должен быть числом';
-        }
-
-        if (isset($params['type'])) {
-            if (!in_array($params['type'], ['address', 'phone'])) {
-                $errors[] = "type должен быть 'address' или 'phone'";
-            } elseif (isset($params['search']) && empty($params['search'])) {
-                $errors[] = 'search не может быть пустым при указанном type';
-            }
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException(implode('. ', $errors));
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $apiParams = ['list_id' => $listId];
@@ -859,15 +865,20 @@ class UniSenderService
      */
     public function getTotalContactsCount(string $login): array
     {
-        if (empty(trim($login))) {
-            throw new \InvalidArgumentException('Логин не может быть пустым');
+        $validator = Validator::make(
+            ['login' => $login],
+            [
+                'login' => ['required', 'string', 'min:1'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        $params = [
-            'login' => $login
-        ];
-
-        return $this->callApi('getTotalContactsCount', $params);
+        return $this->callApi('getTotalContactsCount', [
+            'login' => $login,
+        ]);
     }
 
 
@@ -887,12 +898,20 @@ class UniSenderService
      */
     public function importContacts(array $fieldNames, array $data, array $options = []): array
     {
-        if (count($fieldNames) === 0 || count($fieldNames) > 50) {
-            throw new \InvalidArgumentException('Количество полей должно быть от 1 до 50');
-        }
+        $validator = Validator::make(
+            [
+                'field_names' => $fieldNames,
+                'data' => $data,
+            ],
+            [
+                'field_names' => ['required', 'array', 'min:1', 'max:50'],
+                'data' => ['required', 'array', 'min:1', 'max:10000'],
+                'data.*' => ['required', 'array', 'size:' . count($fieldNames)],
+            ]
+        );
 
-        if (count($data) === 0 || count($data) > 10000) {
-            throw new \InvalidArgumentException('Количество записей должно быть от 1 до 10000');
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $hasEmail = in_array('email', $fieldNames);
@@ -924,8 +943,8 @@ class UniSenderService
         }
 
         $params = [
-            'field_names' => json_encode($fieldNames),
-            'data' => json_encode($data),
+            'field_names' => $fieldNames,
+            'data' => $data,
             'overwrite_tags' => $options['overwrite_tags'] ? 1 : 0,
             'overwrite_lists' => $options['overwrite_lists'] ? 1 : 0
         ];
@@ -954,34 +973,43 @@ class UniSenderService
      */
     public function subscribe(array $fields, string|array $listIds, array $options = []): array
     {
+        $validator = Validator::make(
+            [
+                'fields' => $fields,
+                'list_ids' => is_array($listIds) ? implode(',', $listIds) : $listIds,
+                'tags' => $options['tags'] ?? null,
+                'double_optin' => $options['double_optin'] ?? null,
+                'overwrite' => $options['overwrite'] ?? null,
+            ],
+            [
+                'fields' => ['required', 'array'],
+                'fields.email' => ['nullable', 'email'],
+                'fields.phone' => ['nullable', 'regex:/^\+?\d{10,15}$/'],
+                'list_ids' => ['required', 'string', 'regex:/^\d+(,\d+)*$/'],
+                'tags' => ['nullable', 'string', 'max:255'],
+                'double_optin' => ['nullable', Rule::in([0, 3, 4])],
+                'overwrite' => ['nullable', Rule::in([0, 1, 2])],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
+        }
+
         if (!isset($fields['email']) && !isset($fields['phone'])) {
             throw new \InvalidArgumentException('Необходимо указать email или phone');
         }
 
-        $errors = [];
-
         if (isset($options['tags'])) {
             $tagsCount = count(explode(',', $options['tags']));
             if ($tagsCount > 10) {
-                $errors[] = 'Максимально допустимое количество меток - 10';
+                throw new \InvalidArgumentException('Максимально допустимое количество меток - 10');
             }
         }
 
-        if (isset($options['double_optin']) && !in_array($options['double_optin'], [0, 3, 4])) {
-            $errors[] = 'Параметр double_optin может принимать значения 0, 3 или 4';
-        }
-
-        if (isset($options['overwrite']) && !in_array($options['overwrite'], [0, 1, 2])) {
-            $errors[] = 'Параметр overwrite может принимать значения 0, 1 или 2';
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException(implode('. ', $errors));
-        }
-
         $params = [
-            'fields' => json_encode($fields),
-            'list_ids' => is_array($listIds) ? implode(',', $listIds) : $listIds
+            'fields' => $fields,
+            'list_ids' => is_array($listIds) ? implode(',', $listIds) : $listIds,
         ];
 
         $optionalParams = ['tags', 'double_optin', 'overwrite'];
@@ -1009,23 +1037,34 @@ class UniSenderService
      */
     public function unsubscribe(string $contactType, string $contact, string|array|null $listIds = null): array
     {
-        $errors = [];
+        $validator = Validator::make(
+            [
+                'contact_type' => $contactType,
+                'contact' => $contact,
+                'list_ids' => $listIds,
+            ],
+            [
+                'contact_type' => ['required', Rule::in(['email', 'phone'])],
+                'contact' => [
+                    'required',
+                    function ($attribute, $value, $fail) use ($contactType) {
+                        if ($contactType === 'email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                            $fail('Некорректный формат email');
+                        }
+                    },
+                ],
+                'list_ids' => ['nullable', 'array'],
+                'list_ids.*' => ['nullable', 'integer', 'min:1'],
+            ]
+        );
 
-        if (!in_array($contactType, ['email', 'phone'])) {
-            $errors[] = "Параметр contact_type должен быть 'email' или 'phone'";
-        }
-
-        if ($contactType === 'email' && !filter_var($contact, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "Некорректный формат email";
-        }
-
-        if (!empty($errors)) {
-            throw new \InvalidArgumentException(implode('. ', $errors));
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'contact_type' => $contactType,
-            'contact' => $contact
+            'contact' => $contact,
         ];
 
         if ($listIds !== null) {
@@ -1058,26 +1097,23 @@ class UniSenderService
      */
     public function updateList(int $listId, array $options = []): array
     {
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException('ID списка должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['list_id' => $listId] + $options,
+            [
+                'list_id' => ['required', 'integer', 'min:1'],
+                'title' => ['nullable', 'string', 'max:255'],
+                'before_subscribe_url' => ['nullable', 'url'],
+                'after_subscribe_url' => ['nullable', 'url'],
+            ]
+        );
 
-        if (empty($options)) {
-            throw new \InvalidArgumentException('Не указаны параметры для обновления');
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = ['list_id' => $listId];
-        $allowedParams = ['title', 'before_subscribe_url', 'after_subscribe_url'];
 
         foreach ($options as $key => $value) {
-            if (!in_array($key, $allowedParams)) {
-                throw new \InvalidArgumentException("Недопустимый параметр для обновления: {$key}");
-            }
-
-            if (str_ends_with($key, '_url') && !filter_var($value, FILTER_VALIDATE_URL)) {
-                throw new \InvalidArgumentException("Некорректный URL для параметра {$key}");
-            }
-
             $params[$key] = $value;
         }
 
@@ -1103,18 +1139,28 @@ class UniSenderService
      */
     public function isContactInLists(string $email, array|string $listIds, string $condition = 'or'): array
     {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException("Некорректный email");
-        }
+        $validator = Validator::make(
+            [
+                'email' => $email,
+                'list_ids' => $listIds,
+                'condition' => $condition,
+            ],
+            [
+                'email' => ['required', 'email'],
+                'list_ids' => ['required', 'array'],
+                'list_ids.*' => ['integer', 'min:1'],
+                'condition' => ['required', Rule::in(['or', 'and'])],
+            ]
+        );
 
-        if (!in_array($condition, ['or', 'and'])) {
-            throw new \InvalidArgumentException("condition должно быть 'or' или 'and'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'email' => $email,
             'list_ids' => is_array($listIds) ? implode(',', $listIds) : $listIds,
-            'condition' => $condition
+            'condition' => $condition,
         ];
 
         return $this->callApi('isContactInLists', $params);
@@ -1138,15 +1184,25 @@ class UniSenderService
      */
     public function getContact(string $email, array $options = []): array
     {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException("Некорректный формат email");
+        $validator = Validator::make(
+            ['email' => $email] + $options,
+            [
+                'email' => ['required', 'email'],
+                'include_lists' => ['nullable', 'boolean'],
+                'include_fields' => ['nullable', 'boolean'],
+                'include_details' => ['nullable', 'boolean'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'email' => $email,
-            'include_lists' => isset($options['include_lists']) ? 1 : 0,
-            'include_fields' => isset($options['include_fields']) ? 1 : 0,
-            'include_details' => isset($options['include_details']) ? 1 : 0
+            'include_lists' => $options['include_lists'] ? 1 : 0,
+            'include_fields' => $options['include_fields'] ? 1 : 0,
+            'include_details' => $options['include_details'] ? 1 : 0,
         ];
 
         return $this->callApi('getContact', $params);
@@ -1191,17 +1247,21 @@ class UniSenderService
      */
     public function checkEmail(int|array $emailIds): array
     {
-        $ids = is_array($emailIds) ? $emailIds : explode(',', str_replace(' ', '', $emailIds));
+        $ids = is_array($emailIds)
+            ? $emailIds
+            : explode(',', str_replace(' ', '', $emailIds));
         $ids = array_map('intval', $ids);
 
-        if (count($ids) > 500) {
-            throw new \InvalidArgumentException('Максимум 500 emailId в запросе');
-        }
+        $validator = Validator::make(
+            ['email_ids' => $ids],
+            [
+                'email_ids' => ['required', 'array', 'max:500'],
+                'email_ids.*' => ['required', 'integer', 'min:1'],
+            ]
+        );
 
-        foreach ($ids as $id) {
-            if ($id <= 0) {
-                throw new \InvalidArgumentException("emailId должно быть положительным числом: $id");
-            }
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -1226,8 +1286,15 @@ class UniSenderService
      */
     public function checkSms(int|string $smsId): array
     {
-        if (!is_numeric($smsId) || $smsId <= 0) {
-            throw new \InvalidArgumentException("smsId должно быть положительным числом: $smsId");
+        $validator = Validator::make(
+            ['sms_id' => $smsId],
+            [
+                'sms_id' => ['required', 'integer', 'min:1'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -1267,45 +1334,42 @@ class UniSenderService
      */
     public function createCampaign(int $messageId, array $options = []): array
     {
-        if ($messageId <= 0) {
-            throw new \InvalidArgumentException("ID сообщения должно быть положительным числом");
+        $validator = Validator::make(
+            ['message_id' => $messageId] + $options,
+            [
+                'message_id' => ['required', 'integer', 'min:1'],
+                'start_time' => ['nullable', 'date', 'after_or_equal:now', 'before_or_equal:' . Carbon::now()->addDays(100)->toDateTimeString()],
+                'timezone' => ['nullable', 'string'],
+                'contacts' => ['nullable', 'array'],
+                'contacts.*' => ['integer', 'min:1'],
+                'contacts_url' => ['nullable', 'url'],
+                'track_read' => ['nullable', 'boolean'],
+                'track_links' => ['nullable', 'boolean'],
+                'track_ga' => ['nullable', 'boolean'],
+                'payment_limit' => ['nullable', 'integer', 'min:1'],
+                'payment_currency' => ['nullable', 'string', 'in:USD,EUR,RUB'],
+                'ga_medium' => ['nullable', 'string'],
+                'ga_source' => ['nullable', 'string'],
+                'ga_campaign' => ['nullable', 'string'],
+                'ga_content' => ['nullable', 'string'],
+                'ga_term' => ['nullable', 'string'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        //валидация start_time с использованием Carbon
-        if (isset($options['start_time'])) {
-            try {
-                $startTime = Carbon::parse($options['start_time']);
-                $maxDate = Carbon::now()->addDays(100);
-
-                if ($startTime->gt($maxDate)) {
-                    throw new \InvalidArgumentException(
-                        "Дата старта не может быть больше 100 дней от текущей"
-                    );
-                }
-
-                //приводим к нужному формату
-                $options['start_time'] = $startTime->format('Y-m-d H:i');
-
-            } catch (\Exception $e) {
-                throw new \InvalidArgumentException(
-                    "Неверный формат даты. Используйте 'ГГГГ-ММ-ДД чч:мм'"
-                );
-            }
-        }
-
-        //валидация contacts/contacts_url
         if (isset($options['contacts']) && isset($options['contacts_url'])) {
             throw new \InvalidArgumentException("Используйте только contacts или contacts_url");
         }
 
-        //подготовка параметров
         $params = [
             'message_id' => $messageId,
-            'track_read' => isset($options['track_read']) ? 1 : 0,
-            'track_links' => isset($options['track_links']) ? 1 : 0
+            'track_read' => $options['track_read'] ?? false ? 1 : 0,
+            'track_links' => $options['track_links'] ?? false ? 1 : 0,
         ];
 
-        //добавление опциональных параметров
         $optionalParams = [
             'start_time', 'timezone', 'contacts_url',
             'track_ga', 'payment_limit', 'payment_currency'
@@ -1317,14 +1381,12 @@ class UniSenderService
             }
         }
 
-        //обработка contacts
         if (isset($options['contacts'])) {
             $params['contacts'] = is_array($options['contacts'])
                 ? implode(',', $options['contacts'])
                 : $options['contacts'];
         }
 
-        //параметры Google Analytics
         if (!empty($options['track_ga'])) {
             $gaParams = ['ga_medium', 'ga_source', 'ga_campaign', 'ga_content', 'ga_term'];
             foreach ($gaParams as $gaParam) {
@@ -1367,28 +1429,45 @@ class UniSenderService
      */
     public function createEmailMessage(array $params): array
     {
-        //обязательные параметры (если не используется шаблон)
         $requiredWithoutTemplate = ['sender_name', 'sender_email', 'subject', 'body', 'list_id'];
 
-        if (!isset($params['template_id']) && !isset($params['system_template_id'])) {
-            foreach ($requiredWithoutTemplate as $field) {
-                if (empty($params[$field])) {
-                    throw new \InvalidArgumentException("Обязательный параметр {$field} отсутствует");
+        $validator = Validator::make($params, [
+            'sender_name' => ['nullable', 'string'],
+            'sender_email' => ['nullable', 'email'],
+            'subject' => ['nullable', 'string'],
+            'body' => ['nullable', 'string'],
+            'list_id' => ['nullable', 'integer', 'min:1'],
+            'text_body' => ['nullable', 'string'],
+            'generate_text' => ['nullable', 'boolean'],
+            'tag' => ['nullable', 'string'],
+            'lang' => ['nullable', 'string'],
+            'template_id' => ['nullable', 'integer', 'min:1'],
+            'system_template_id' => ['nullable', 'integer', 'min:1'],
+            'wrap_type' => ['nullable', 'string'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => ['nullable', 'string'],
+        ]);
+
+        if (!$validator->fails()) {
+            if (!isset($params['template_id']) && !isset($params['system_template_id'])) {
+                foreach ($requiredWithoutTemplate as $field) {
+                    if (empty($params[$field])) {
+                        throw new \InvalidArgumentException("Обязательный параметр {$field} отсутствует");
+                    }
                 }
             }
+
+            if (!empty($params['attachments']) && is_array($params['attachments'])) {
+                foreach ($params['attachments'] as $filename => $content) {
+                    if (!preg_match('/^[a-z0-9_\-\.]+$/i', $filename)) {
+                        throw new \InvalidArgumentException("Имя файла должно содержать только латинские символы");
+                    }
+                }
+            }
+        } else {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        //валидация email отправителя
-        if (isset($params['sender_email']) && !filter_var($params['sender_email'], FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException("Некорректный email отправителя");
-        }
-
-        //валидация list_id
-        if (isset($params['list_id']) && (!is_numeric($params['list_id']) || $params['list_id'] <= 0)) {
-            throw new \InvalidArgumentException("list_id должен быть положительным числом");
-        }
-
-        //подготовка параметров запроса
         $apiParams = [];
         $allowedParams = [
             'sender_name', 'sender_email', 'subject', 'body', 'list_id',
@@ -1402,17 +1481,12 @@ class UniSenderService
             }
         }
 
-        //обработка generate_text (конвертация bool в int)
         if (isset($apiParams['generate_text'])) {
             $apiParams['generate_text'] = $apiParams['generate_text'] ? 1 : 0;
         }
 
-        //обработка вложений (если есть)
         if (!empty($params['attachments']) && is_array($params['attachments'])) {
             foreach ($params['attachments'] as $filename => $content) {
-                if (!preg_match('/^[a-z0-9_\-\.]+$/i', $filename)) {
-                    throw new \InvalidArgumentException("Имя файла должно содержать только латинские символы");
-                }
                 $apiParams["attachments[{$filename}]"] = $content;
             }
         }
@@ -1440,24 +1514,29 @@ class UniSenderService
      */
     public function createSmsMessage(string $sender, string $body, int $listId, ?string $tag = null): array
     {
-        if (!preg_match('/^[a-z0-9]{3,11}$/i', $sender)) {
-            throw new \InvalidArgumentException(
-                "sender должно содержать 3-11 латинских букв или цифр"
-            );
-        }
+        $validator = Validator::make(
+            [
+                'sender' => $sender,
+                'body' => $body,
+                'list_id' => $listId,
+                'tag' => $tag,
+            ],
+            [
+                'sender' => ['required', 'string', 'regex:/^[a-z0-9]{3,11}$/i'],
+                'body' => ['required', 'string', 'min:1'],
+                'list_id' => ['required', 'integer', 'min:1'],
+                'tag' => ['nullable', 'string'],
+            ]
+        );
 
-        if (empty(trim($body))) {
-            throw new \InvalidArgumentException("body не может быть пустым");
-        }
-
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException("list_id должен быть положительным числом");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
             'sender' => $sender,
             'body' => $body,
-            'list_id' => $listId
+            'list_id' => $listId,
         ];
 
         if ($tag !== null) {
@@ -1482,13 +1561,21 @@ class UniSenderService
      */
     public function deleteMessage(int $messageId): array
     {
-        if ($messageId <= 0) {
-            throw new \InvalidArgumentException('messageId должен быть положительным числом');
+        $validator = Validator::make(
+            ['message_id' => $messageId],
+            ['message_id' => ['required', 'integer', 'min:1']],
+            [
+                'message_id.required' => 'messageId обязателен',
+                'message_id.integer' => 'messageId должен быть целым числом',
+                'message_id.min' => 'messageId должен быть положительным числом',
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
-        $params = [
-            'message_id' => $messageId,
-        ];
+        $params = ['message_id' => $messageId];
 
         return $this->callApi('deleteMessage', $params);
     }
@@ -1532,12 +1619,16 @@ class UniSenderService
      */
     public function getWebVersion(int $campaignId, string $format = 'json'): array
     {
-        if ($campaignId <= 0) {
-            throw new \InvalidArgumentException('campaignId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['campaign_id' => $campaignId, 'format' => $format],
+            [
+                'campaign_id' => ['required', 'integer', 'min:1'],
+                'format' => ['required', Rule::in(['json', 'html'])],
+            ]
+        );
 
-        if (!in_array($format, ['json', 'html'])) {
-            throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -1589,6 +1680,38 @@ class UniSenderService
      */
     public function sendEmail(string $email, string $senderName, string $senderEmail, string $subject, string $body, int $listId, array $options = []): array
     {
+        $validator = Validator::make(
+            [
+                'email' => $email,
+                'sender_name' => $senderName,
+                'sender_email' => $senderEmail,
+                'subject' => $subject,
+                'body' => $body,
+                'list_id' => $listId,
+                'attachments' => $options['attachments'] ?? null,
+                'metadata' => $options['metadata'] ?? null,
+                'headers' => $options['headers'] ?? null,
+            ],
+            [
+                'email' => ['required', 'email'],
+                'sender_name' => ['required', 'string'],
+                'sender_email' => ['required', 'email'],
+                'subject' => ['required', 'string'],
+                'body' => ['required', 'string'],
+                'list_id' => ['required', 'integer', 'min:1'],
+                'attachments' => ['nullable', 'array'],
+                'attachments.*' => ['nullable', 'string'],
+                'metadata' => ['nullable', 'array'],
+                'metadata.*' => ['nullable', 'string'],
+                'headers' => ['nullable', 'array'],
+                'headers.*' => ['nullable', 'string'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
+        }
+
         $params = [
             'email' => $email,
             'sender_name' => $senderName,
@@ -1650,14 +1773,24 @@ class UniSenderService
      */
     public function sendSms(string|array $phones, string $sender, string $text): array
     {
+        $validator = Validator::make(
+            ['phones' => $phones, 'sender' => $sender, 'text' => $text],
+            [
+                'phones' => ['required', 'array', 'max:150'],
+                'phones.*' => ['required', 'string', 'regex:/^\+?\d+$/'],
+                'sender' => ['required', 'string', 'regex:/^[a-z0-9]{3,11}$/i'],
+                'text' => ['required', 'string', 'min:1'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
+        }
+
         $phoneList = is_array($phones) ? $phones : [$phones];
-        $phoneList = array_map(function($phone) {
+        $phoneList = array_map(function ($phone) {
             return ltrim($phone, '+');
         }, $phoneList);
-
-        if (count($phoneList) > 150) {
-            throw new \InvalidArgumentException('Максимально 150 номеров в запросе');
-        }
 
         $params = [
             'phone' => implode(',', $phoneList),
@@ -1684,13 +1817,21 @@ class UniSenderService
      */
     public function sendTestEmail(int $letterId, string|array $emails): array
     {
-        $emailList = is_array($emails) ? $emails : explode(',', str_replace(' ', '', $emails));
+        $validator = Validator::make(
+            ['letter_id' => $letterId, 'emails' => $emails],
+            [
+                'letter_id' => ['required', 'integer', 'min:1'],
+                'emails' => ['required', 'array'],
+                'emails.*' => ['required', 'email'],
+            ]
+        );
 
-        foreach ($emailList as $email) {
-            if (!filter_var(trim($email), FILTER_VALIDATE_EMAIL)) {
-                throw new \InvalidArgumentException("Invalid email address: $email");
-            }
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
+
+        $emailList = is_array($emails) ? $emails : explode(',', str_replace(' ', '', $emails));
+        $emailList = array_map('trim', $emailList);
 
         $params = [
             'id' => $letterId,
@@ -1729,31 +1870,29 @@ class UniSenderService
      */
     public function updateEmailMessage(int $messageId, array $params = []): array
     {
-        if ($messageId <= 0) {
-            throw new \InvalidArgumentException('Идентификатор сообщения должен быть положительным числом');
+        $validator = Validator::make(
+            ['message_id' => $messageId] + $params,
+            [
+                'message_id' => ['required', 'integer', 'min:1'],
+                'sender_name' => ['nullable', 'string', 'min:1'],
+                'sender_email' => ['nullable', 'email'],
+                'subject' => ['nullable', 'string', 'min:1'],
+                'body' => ['nullable', 'string'],
+                'list_id' => ['nullable', 'integer', 'min:1'],
+                'text_body' => ['nullable', 'string'],
+                'lang' => ['nullable', 'string'],
+                'categories' => ['nullable', 'array'],
+                'categories.*' => ['nullable', 'string'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $requestParams = ['id' => $messageId];
 
-        if (isset($params['sender_name'])) {
-            if (empty($params['sender_name'])) {
-                throw new \InvalidArgumentException('Имя отправителя не может быть пустым');
-            }
-            $requestParams['sender_name'] = $params['sender_name'];
-        }
-
-        if (isset($params['sender_email'])) {
-            if (!filter_var($params['sender_email'], FILTER_VALIDATE_EMAIL)) {
-                throw new \InvalidArgumentException('Некорректный email отправителя');
-            }
-            $requestParams['sender_email'] = $params['sender_email'];
-        }
-
-        if (isset($params['subject']) && empty($params['subject'])) {
-            throw new \InvalidArgumentException('Тема письма не может быть пустой');
-        }
-
-        $optionalParams = ['subject', 'body', 'list_id', 'text_body', 'lang', 'categories'];
+        $optionalParams = ['sender_name', 'sender_email', 'subject', 'body', 'list_id', 'text_body', 'lang', 'categories'];
         foreach ($optionalParams as $param) {
             if (isset($params[$param])) {
                 $requestParams[$param] = $params[$param];
@@ -1780,20 +1919,29 @@ class UniSenderService
      */
     public function updateOptInEmail(string $senderName, string $senderEmail, string $subject, string $body, int $listId): array
     {
-        if (empty($senderName)) {
-            throw new \InvalidArgumentException('Имя отправителя не может быть пустым');
-        }
+        $validator = Validator::make(
+            [
+                'sender_name' => $senderName,
+                'sender_email' => $senderEmail,
+                'subject' => $subject,
+                'body' => $body,
+                'list_id' => $listId,
+            ],
+            [
+                'sender_name' => ['required', 'string', 'min:1'],
+                'sender_email' => ['required', 'email'],
+                'subject' => ['required', 'string'],
+                'body' => ['required', 'string', function ($attribute, $value, $fail) {
+                    if (!str_contains($value, '{{ConfirmUrl}}')) {
+                        $fail('body должно содержать {{ConfirmUrl}}');
+                    }
+                }],
+                'list_id' => ['required', 'integer', 'min:1'],
+            ]
+        );
 
-        if (empty($senderEmail) || !filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException('Неверный адрес email отправителя');
-        }
-
-        if (!str_contains($body, '{{ConfirmUrl}}')) {
-            throw new \InvalidArgumentException('body должно содержать {{ConfirmUrl}}');
-        }
-
-        if ($listId <= 0) {
-            throw new \InvalidArgumentException('listId должно быть положительным числом');
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException($validator->errors()->all());
         }
 
         $params = [
@@ -1836,33 +1984,36 @@ class UniSenderService
      */
     public function getSenderDomainList(string $username, array $options = []): array
     {
+        $validator = Validator::make(
+            ['username' => $username] + $options,
+            [
+                'username' => ['required', 'string'],
+                'format' => ['nullable', Rule::in(['json', 'html'])],
+                'domain' => ['nullable', 'string'],
+                'limit' => ['nullable', 'integer', 'between:1,100'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
+        }
+
         $params = [
             'username' => $username,
             'format' => $options['format'] ?? 'json',
         ];
-
-        if (!in_array($params['format'], ['json', 'html'])) {
-            throw new \InvalidArgumentException("Format must be either 'json' or 'html'");
-        }
 
         if (isset($options['domain'])) {
             $params['domain'] = $options['domain'];
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 100) {
-                throw new \InvalidArgumentException('Limit must be between 1 and 100');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('Offset must be 0 or greater');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('getSenderDomainList', $params);
@@ -1896,16 +2047,20 @@ class UniSenderService
      */
     public function createEmailTemplate(string $title, string $subject, string $body, array $options = []): array
     {
-        if (empty($title)) {
-            throw new \InvalidArgumentException('title не может быть пустым');
-        }
+        $validator = Validator::make(
+            ['title' => $title, 'subject' => $subject, 'body' => $body] + $options,
+            [
+                'title' => ['required', 'string', 'min:1'],
+                'subject' => ['required', 'string', 'min:1'],
+                'body' => ['required', 'string', 'min:1'],
+                'description' => ['nullable', 'string'],
+                'text_body' => ['nullable', 'string'],
+                'lang' => ['nullable', Rule::in(['ru', 'en', 'ua', 'it', 'da', 'de', 'es', 'fr', 'nl', 'pl', 'pt', 'tr'])],
+            ]
+        );
 
-        if (empty($subject)) {
-            throw new \InvalidArgumentException('subject не может быть пустой');
-        }
-
-        if (empty($body)) {
-            throw new \InvalidArgumentException('body не может быть пустым');
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
@@ -1918,13 +2073,6 @@ class UniSenderService
         foreach ($optionalParams as $param) {
             if (isset($options[$param])) {
                 $params[$param] = $options[$param];
-            }
-        }
-
-        if (isset($params['lang'])) {
-            $supportedLangs = ['ru', 'en', 'ua', 'it', 'da', 'de', 'es', 'fr', 'nl', 'pl', 'pt', 'tr'];
-            if (!in_array($params['lang'], $supportedLangs)) {
-                throw new \InvalidArgumentException('Указан неподдерживаемый язык');
             }
         }
 
@@ -1946,13 +2094,16 @@ class UniSenderService
      */
     public function deleteTemplate(int $templateId): array
     {
-        if ($templateId <= 0) {
-            throw new \InvalidArgumentException('templateId должен быть положительным числом');
+        $validator = Validator::make(
+            ['template_id' => $templateId],
+            ['template_id' => ['required', 'integer', 'min:1']]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
-        $params = [
-            'template_id' => $templateId,
-        ];
+        $params = ['template_id' => $templateId];
 
         return $this->callApi('deleteTemplate', $params);
     }
@@ -1990,25 +2141,28 @@ class UniSenderService
      */
     public function getTemplate(?int $templateId = null, ?int $systemTemplateId = null, string $format = 'json'): array
     {
-        if ($templateId === null && $systemTemplateId === null) {
-            throw new \InvalidArgumentException('Необходимо указать либо templateId, либо systemTemplateId');
+        $validator = Validator::make(
+            ['template_id' => $templateId, 'system_template_id' => $systemTemplateId, 'format' => $format],
+            [
+                'template_id' => ['nullable', 'integer', 'min:1'],
+                'system_template_id' => ['nullable', 'integer', 'min:1'],
+                'format' => ['required', Rule::in(['json', 'html'])],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
-        if (!in_array($format, ['json', 'html'])) {
-            throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
+        if ($templateId === null && $systemTemplateId === null) {
+            throw new \InvalidArgumentException('Необходимо указать либо templateId, либо systemTemplateId');
         }
 
         $params = ['format' => $format];
 
         if ($templateId !== null) {
-            if ($templateId <= 0) {
-                throw new \InvalidArgumentException('templateId должен быть положительным числом');
-            }
             $params['template_id'] = $templateId;
         } else {
-            if ($systemTemplateId <= 0) {
-                throw new \InvalidArgumentException('systemTemplateId должен быть положительным числом');
-            }
             $params['system_template_id'] = $systemTemplateId;
         }
 
@@ -2052,46 +2206,45 @@ class UniSenderService
      */
     public function getTemplates(array $options = []): array
     {
+        $validator = Validator::make(
+            $options,
+            [
+                'type' => ['nullable', Rule::in(['system', 'user'])],
+                'date_from' => ['nullable', 'date_format:Y-m-d H:i'],
+                'date_to' => ['nullable', 'date_format:Y-m-d H:i'],
+                'format' => ['nullable', Rule::in(['json', 'html'])],
+                'limit' => ['nullable', 'integer', 'between:1,100'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
+        }
+
         $params = [];
 
         if (isset($options['type'])) {
-            if (!in_array($options['type'], ['system', 'user'])) {
-                throw new \InvalidArgumentException("Тип шаблона должен быть 'system' или 'user'");
-            }
             $params['type'] = $options['type'];
         }
 
         $dateFields = ['date_from', 'date_to'];
         foreach ($dateFields as $field) {
             if (isset($options[$field])) {
-                if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $options[$field])) {
-                    throw new \InvalidArgumentException("Дата $field должна быть в формате 'ГГГГ-ММ-ДД чч:мм'");
-                }
                 $params[$field] = $options[$field];
             }
         }
 
         if (isset($options['format'])) {
-            if (!in_array($options['format'], ['json', 'html'])) {
-                throw new \InvalidArgumentException("Формат вывода должен быть 'json' или 'html'");
-            }
             $params['format'] = $options['format'];
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 100) {
-                throw new \InvalidArgumentException('Лимит должен быть в диапазоне 1-100');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('Смещение не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('getTemplates', $params);
@@ -2103,8 +2256,8 @@ class UniSenderService
      *
      * @param array $options        Параметры запроса:
      *     - 'type' => string           Тип шаблонов (system|user), по умолчанию 'user'
-     *     - 'date_from' => string      Начальная дата создания в формате 'YYYY-MM-DD HH:MM' (UTC)
-     *     - 'date_to' => string        Конечная дата создания в формате 'YYYY-MM-DD HH:MM' (UTC)
+     *     - 'date_from' => string      Начальная дата создания в формате 'Y-m-d H:i' (UTC)
+     *     - 'date_to' => string        Конечная дата создания в формате 'Y-m-d H:i' (UTC)
      *     - 'format' => string         Формат вывода (json|html), по умолчанию 'json'
      *     - 'limit' => int             Лимит записей (1-100), по умолчанию 50
      *     - 'offset' => int            Смещение выборки (0+), по умолчанию 0
@@ -2133,49 +2286,44 @@ class UniSenderService
      */
     public function listTemplates(array $options = []): array
     {
+        $validator = Validator::make(
+            $options,
+            [
+                'type' => ['nullable', 'string', Rule::in(['system', 'user'])],
+                'date_from' => ['nullable', 'date_format:Y-m-d H:i'],
+                'date_to' => ['nullable', 'date_format:Y-m-d H:i'],
+                'format' => ['nullable', 'string', Rule::in(['json', 'html'])],
+                'limit' => ['nullable', 'integer', 'between:1,100'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
+        }
+
         $params = [];
 
         if (isset($options['type'])) {
-            $type = strtolower($options['type']);
-            if (!in_array($type, ['system', 'user'])) {
-                throw new \InvalidArgumentException("Тип шаблона должен быть 'system' или 'user'");
-            }
-            $params['type'] = $type;
+            $params['type'] = strtolower($options['type']);
         }
 
         foreach (['date_from', 'date_to'] as $dateField) {
             if (isset($options[$dateField])) {
-                if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $options[$dateField])) {
-                    throw new \InvalidArgumentException(
-                        "Дата $dateField должна быть в формате 'ГГГГ-ММ-ДД чч:мм'"
-                    );
-                }
                 $params[$dateField] = $options[$dateField];
             }
         }
 
         if (isset($options['format'])) {
-            $format = strtolower($options['format']);
-            if (!in_array($format, ['json', 'html'])) {
-                throw new \InvalidArgumentException("Формат должен быть 'json' или 'html'");
-            }
-            $params['format'] = $format;
+            $params['format'] = strtolower($options['format']);
         }
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1 || $limit > 100) {
-                throw new \InvalidArgumentException('Лимит должен быть от 1 до 100');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('Смещение не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         return $this->callApi('listTemplates', $params);
@@ -2206,8 +2354,21 @@ class UniSenderService
      */
     public function updateEmailTemplate(int $templateId, array $params = []): array
     {
-        if ($templateId <= 0) {
-            throw new \InvalidArgumentException('Идентификатор шаблона должен быть положительным числом');
+        $validator = Validator::make(
+            ['template_id' => $templateId] + $params,
+            [
+                'template_id' => ['required', 'integer', 'min:1'],
+                'title' => ['nullable', 'string', 'min:1'],
+                'subject' => ['nullable', 'string', 'min:1'],
+                'body' => ['nullable', 'string', 'min:1'],
+                'description' => ['nullable', 'string'],
+                'text_body' => ['nullable', 'string'],
+                'lang' => ['nullable', Rule::in(['ru', 'en', 'ua', 'it', 'da', 'de', 'es', 'fr', 'nl', 'pl', 'pt', 'tr'])],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         if (empty($params)) {
@@ -2215,24 +2376,6 @@ class UniSenderService
         }
 
         $requestParams = ['template_id' => $templateId];
-
-        if (isset($params['title']) && empty($params['title'])) {
-            throw new \InvalidArgumentException('Название шаблона не может быть пустым');
-        }
-
-        if (isset($params['subject']) && empty($params['subject'])) {
-            throw new \InvalidArgumentException('Тема письма не может быть пустой');
-        }
-
-        if (isset($params['body']) && empty($params['body'])) {
-            throw new \InvalidArgumentException('Тело шаблона не может быть пустым');
-        }
-
-        $supportedLangs = ['ru', 'en', 'ua', 'it', 'da', 'de', 'es', 'fr', 'nl', 'pl', 'pt', 'tr'];
-
-        if (isset($params['lang']) && !in_array($params['lang'], $supportedLangs)) {
-            throw new \InvalidArgumentException('Указан неподдерживаемый язык');
-        }
 
         $allowedParams = ['title', 'subject', 'body', 'description', 'text_body', 'lang'];
         foreach ($allowedParams as $param) {
@@ -2264,22 +2407,21 @@ class UniSenderService
      */
     public function createSubscriberNote(int $subscriberId, string $content): array
     {
-        if ($subscriberId <= 0) {
-            throw new \InvalidArgumentException('subscriberId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['subscriber_id' => $subscriberId, 'content' => $content],
+            [
+                'subscriber_id' => ['required', 'integer', 'min:1'],
+                'content' => ['required', 'string', 'min:1', 'max:255'],
+            ]
+        );
 
-        $content = trim($content);
-        if (empty($content)) {
-            throw new \InvalidArgumentException('content не может быть пустым');
-        }
-
-        if (mb_strlen($content) > 255) {
-            throw new \InvalidArgumentException('content не должен превышать 255 символов');
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
             'subscriber_id' => $subscriberId,
-            'content' => $content,
+            'content' => trim($content),
         ];
 
         return $this->callApi('createSubscriberNote', $params);
@@ -2304,26 +2446,22 @@ class UniSenderService
      */
     public function updateSubscriberNote(int $noteId, string $content, string $format = 'json'): array
     {
-        if ($noteId <= 0) {
-            throw new \InvalidArgumentException('noteId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['note_id' => $noteId, 'content' => $content, 'format' => $format],
+            [
+                'note_id' => ['required', 'integer', 'min:1'],
+                'content' => ['required', 'string', 'min:1', 'max:255'],
+                'format' => ['required', Rule::in(['json', 'html'])],
+            ]
+        );
 
-        $content = trim($content);
-        if (empty($content)) {
-            throw new \InvalidArgumentException('content не может быть пустым');
-        }
-
-        if (mb_strlen($content) > 255) {
-            throw new \InvalidArgumentException('content не должен превышать 255 символов');
-        }
-
-        if (!in_array($format, ['json', 'html'])) {
-            throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
             'id' => $noteId,
-            'content' => $content,
+            'content' => trim($content),
             'format' => $format,
         ];
 
@@ -2346,12 +2484,16 @@ class UniSenderService
      */
     public function deleteSubscriberNote(int $noteId, string $format = 'json'): array
     {
-        if ($noteId <= 0) {
-            throw new \InvalidArgumentException('noteId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['note_id' => $noteId, 'format' => $format],
+            [
+                'note_id' => ['required', 'integer', 'min:1'],
+                'format' => ['required', Rule::in(['json', 'html'])],
+            ]
+        );
 
-        if (!in_array($format, ['json', 'html'])) {
-            throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
@@ -2387,12 +2529,16 @@ class UniSenderService
      */
     public function getSubscriberNote(int $noteId, string $format = 'json'): array
     {
-        if ($noteId <= 0) {
-            throw new \InvalidArgumentException('noteId должен быть положительным числом');
-        }
+        $validator = Validator::make(
+            ['note_id' => $noteId, 'format' => $format],
+            [
+                'note_id' => ['required', 'integer', 'min:1'],
+                'format' => ['required', Rule::in(['json', 'html'])],
+            ]
+        );
 
-        if (!in_array($format, ['json', 'html'])) {
-            throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
@@ -2437,60 +2583,47 @@ class UniSenderService
      */
     public function getSubscriberNotes(int $subscriberId, array $options = []): array
     {
-        if ($subscriberId <= 0) {
-            throw new \InvalidArgumentException('subscriberId должен быть положительным числом');
+        $validator = Validator::make(
+            ['subscriber_id' => $subscriberId] + $options,
+            [
+                'subscriber_id' => ['required', 'integer', 'min:1'],
+                'limit' => ['nullable', 'integer', 'min:1'],
+                'offset' => ['nullable', 'integer', 'min:0'],
+                'order_type' => ['nullable', 'string', Rule::in(['ASC', 'DESC'])],
+                'order_by' => ['nullable', 'string', Rule::in(['created_at', 'updated_at', 'pinned_at'])],
+                'is_pinned' => ['nullable', 'integer', Rule::in([0, 1])],
+                'format' => ['nullable', 'string', Rule::in(['json', 'html'])],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
-        $params = [
-            'subscriber_id' => $subscriberId,
-        ];
+        $params = ['subscriber_id' => $subscriberId];
 
         if (isset($options['limit'])) {
-            $limit = (int)$options['limit'];
-            if ($limit < 1) {
-                throw new \InvalidArgumentException('Лимит должен быть положительным числом');
-            }
-            $params['limit'] = $limit;
+            $params['limit'] = (int)$options['limit'];
         }
 
         if (isset($options['offset'])) {
-            $offset = (int)$options['offset'];
-            if ($offset < 0) {
-                throw new \InvalidArgumentException('offset не может быть отрицательным');
-            }
-            $params['offset'] = $offset;
+            $params['offset'] = (int)$options['offset'];
         }
 
         if (isset($options['order_type'])) {
-            $orderType = strtoupper($options['order_type']);
-            if (!in_array($orderType, ['ASC', 'DESC'])) {
-                throw new \InvalidArgumentException("order_type должен быть 'ASC' или 'DESC'");
-            }
-            $params['order_type'] = $orderType;
+            $params['order_type'] = strtoupper($options['order_type']);
         }
 
         if (isset($options['order_by'])) {
-            $orderBy = strtolower($options['order_by']);
-            if (!in_array($orderBy, ['created_at', 'updated_at', 'pinned_at'])) {
-                throw new \InvalidArgumentException("order_by должно быть 'created_at', 'updated_at' или 'pinned_at'");
-            }
-            $params['order_by'] = $orderBy;
+            $params['order_by'] = strtolower($options['order_by']);
         }
 
         if (isset($options['is_pinned'])) {
-            $isPinned = (int)$options['is_pinned'];
-            if (!in_array($isPinned, [0, 1])) {
-                throw new \InvalidArgumentException("is_pinned должен быть 0 или 1");
-            }
-            $params['is_pinned'] = $isPinned;
+            $params['is_pinned'] = (int)$options['is_pinned'];
         }
 
         if (isset($options['format'])) {
-            $format = strtolower($options['format']);
-            if (!in_array($format, ['json', 'html'])) {
-                throw new \InvalidArgumentException("format должен быть 'json' или 'html'");
-            }
-            $params['format'] = $format;
+            $params['format'] = strtolower($options['format']);
         }
 
         return $this->callApi('getSubscriberNotes', $params);
@@ -2517,29 +2650,32 @@ class UniSenderService
      */
     public function createField(string $name, string $type, ?string $publicName = null): array
     {
-        if (!preg_match('/^[a-z][a-z0-9_]*$/i', $name)) {
-            throw new \InvalidArgumentException(
-                "Имя поля должно содержать только латинские буквы, цифры и _, начинаться с буквы"
-            );
-        }
+        $validator = Validator::make(
+            ['name' => $name, 'type' => $type, 'public_name' => $publicName],
+            [
+                'name' => [
+                    'required',
+                    'string',
+                    'regex:/^[a-z][a-z0-9_]*$/i',
+                    function ($attribute, $value, $fail) {
+                        $reservedNames = ['tags', 'email', 'phone', 'email_status', 'phone_status'];
+                        if (in_array(strtolower($value), array_map('strtolower', $reservedNames))) {
+                            $fail("Имя поля не может совпадать с системными: " . implode(', ', $reservedNames));
+                        }
+                    },
+                ],
+                'type' => ['required', Rule::in(['string', 'text', 'number', 'date', 'bool'])],
+                'public_name' => ['nullable', 'string'],
+            ]
+        );
 
-        $reservedNames = ['tags', 'email', 'phone', 'email_status', 'phone_status'];
-        if (in_array(strtolower($name), array_map('strtolower', $reservedNames))) {
-            throw new \InvalidArgumentException(
-                "Имя поля не может совпадать с системными: " . implode(', ', $reservedNames)
-            );
-        }
-
-        $allowedTypes = ['string', 'text', 'number', 'date', 'bool'];
-        if (!in_array($type, $allowedTypes)) {
-            throw new \InvalidArgumentException(
-                "Недопустимый тип поля. Допустимые значения: " . implode(', ', $allowedTypes)
-            );
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
             'name' => $name,
-            'type' => $type
+            'type' => $type,
         ];
 
         if ($publicName !== null) {
@@ -2562,10 +2698,6 @@ class UniSenderService
      */
     public function deleteField(int $fieldId): array
     {
-        if ($fieldId <= 0) {
-            throw new \InvalidArgumentException("fieldId должен быть положительным числом");
-        }
-
         return $this->callApi('deleteField', ['id' => $fieldId]);
     }
 
@@ -2633,32 +2765,36 @@ class UniSenderService
      */
     public function updateField(int $id, string $name, ?string $publicName = null): array
     {
-        if ($id <= 0) {
-            throw new \InvalidArgumentException("ID поля должен быть положительным числом");
-        }
+        $validator = Validator::make(
+            ['id' => $id, 'name' => $name, 'public_name' => $publicName],
+            [
+                'id' => ['required', 'integer', 'min:1'],
+                'name' => [
+                    'required',
+                    'string',
+                    'regex:/^[a-z][a-z0-9_]*$/i',
+                    function ($attribute, $value, $fail) {
+                        $reservedNames = ['tags', 'email', 'phone', 'email_status', 'phone_status'];
+                        if (in_array(strtolower($value), array_map('strtolower', $reservedNames))) {
+                            $fail("Имя поля не может совпадать с системными: " . implode(', ', $reservedNames));
+                        }
+                    },
+                ],
+                'public_name' => [
+                    'nullable',
+                    'string',
+                    'regex:/^[a-z][a-z0-9_-]*$/i',
+                ],
+            ]
+        );
 
-        if (!preg_match('/^[a-z][a-z0-9_]*$/i', $name)) {
-            throw new \InvalidArgumentException(
-                "Имя поля должно содержать только латинские буквы, цифры и _, начинаться с буквы"
-            );
-        }
-
-        $reservedNames = ['tags', 'email', 'phone', 'email_status', 'phone_status'];
-        if (in_array(strtolower($name), array_map('strtolower', $reservedNames))) {
-            throw new \InvalidArgumentException(
-                "Имя поля не может совпадать с системными: " . implode(', ', $reservedNames)
-            );
-        }
-
-        if ($publicName !== null && !preg_match('/^[a-z][a-z0-9_-]*$/i', $publicName)) {
-            throw new \InvalidArgumentException(
-                "Отображаемое имя может содержать только латинские буквы, цифры, _ и -, начинаться с буквы"
-            );
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $params = [
             'id' => $id,
-            'name' => $name
+            'name' => $name,
         ];
 
         if ($publicName !== null) {
@@ -2689,23 +2825,34 @@ class UniSenderService
      */
     public function getContactFieldValues(string $email, array|string $fieldIds): array
     {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \InvalidArgumentException("Некорректный формат email");
+        $validator = Validator::make(
+            ['email' => $email, 'field_ids' => $fieldIds],
+            [
+                'email' => ['required', 'email'],
+                'field_ids' => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        $fieldIdsStr = is_array($value) ? implode(',', $value) : $value;
+                        if (empty(trim($fieldIdsStr))) {
+                            $fail("Не указаны ID полей");
+                        }
+                        if (!preg_match('/^\d+(,\d+)*$/', $fieldIdsStr)) {
+                            $fail("ID полей должны быть числами, разделенными запятыми");
+                        }
+                    },
+                ],
+            ]
+        );
+
+        if ($validator->fails()) {
+            throw new \InvalidArgumentException(implode('; ', $validator->errors()->all()));
         }
 
         $fieldIdsStr = is_array($fieldIds) ? implode(',', $fieldIds) : $fieldIds;
 
-        if (empty(trim($fieldIdsStr))) {
-            throw new \InvalidArgumentException("Не указаны ID полей");
-        }
-
-        if (!preg_match('/^\d+(,\d+)*$/', $fieldIdsStr)) {
-            throw new \InvalidArgumentException("ID полей должны быть числами, разделенными запятыми");
-        }
-
         $params = [
             'email' => $email,
-            'field_ids' => $fieldIdsStr
+            'field_ids' => $fieldIdsStr,
         ];
 
         try {

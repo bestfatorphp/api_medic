@@ -51,8 +51,10 @@ class Common extends Command
     public function __construct()
     {
         parent::__construct();
-        //установка лимита памяти
-        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
+
+        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
+        set_time_limit(0); //без ограничения времени выполнения
+        DB::disableQueryLog(); //отключаем логирование запросов
     }
 
     /**

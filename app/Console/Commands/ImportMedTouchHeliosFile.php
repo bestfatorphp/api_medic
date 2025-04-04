@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
@@ -81,8 +82,10 @@ class ImportMedTouchHeliosFile extends Command
         if (!Storage::exists(self::HTML_DUMP_PATH)) {
             Storage::makeDirectory(self::HTML_DUMP_PATH);
         }
-        //установка лимита памяти
-        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
+
+        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
+        set_time_limit(0); //без ограничения времени выполнения
+        DB::disableQueryLog(); //отключаем логирование запросов
     }
 
     /**

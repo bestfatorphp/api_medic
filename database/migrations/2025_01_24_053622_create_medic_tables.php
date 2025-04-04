@@ -129,7 +129,7 @@ class CreateMedicTables extends Migration
             $table->string('acquisition_tool')->nullable()->comment('Инструмент привлечения');
             $table->string('acquisition_method')->nullable()->comment('Способ привлечения');
             $table->string('username')->nullable()->comment('Никнэйм');
-            $table->string('specialization')->nullable()->comment('Название чатов в которых состоит пользователь');
+            $table->text('specialization')->nullable()->comment('Название чатов в которых состоит пользователь');
             $table->integer('planned_actions')->nullable()->comment('Запланированные действия');
             $table->integer('resulting_actions')->nullable()->comment('Результативные действия');
             $table->string('verification_status')->nullable()->comment('Статус верификации');

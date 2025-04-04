@@ -14,7 +14,7 @@ use Symfony\Component\Console\Helper\ProgressBar;
 class ImportTelegramUsers extends Command
 {
     /**
-     * Пример: php artisan import:telegram-users --chunk=1000 --memory=128
+     * Пример: php artisan import:telegram-users --chunk=1000
      * @var string
      */
     protected $signature = 'import:telegram-users
@@ -36,8 +36,7 @@ class ImportTelegramUsers extends Command
      */
     public function handle(): int
     {
-        //установливаем ограничение по памяти
-        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
+        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установливаем ограничение по памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
 
