@@ -32,11 +32,11 @@ class ActivityMT extends Model
     ];
 
     /**
-     * Действия МТ (была hasMany, но по реализации стало понятно, что это HasOne)
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * Действия МТ (была hasMany, но по реализации стало понятно, что это hasOne)
+     * @return \Illuminate\Database\Eloquent\Relations\hasOne
      */
     public function actions_mt()
     {
-        return $this->HasOne(ActionMT::class, 'activity_id');
+        return $this->hasOne(ActionMT::class, 'activity_id');
     }
 }
