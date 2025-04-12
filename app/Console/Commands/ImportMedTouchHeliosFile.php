@@ -113,7 +113,7 @@ class ImportMedTouchHeliosFile extends Command
             //обрабатываем CSV
             $this->processCsv();
 
-            //удаляем временный файл если не нужно сохранять
+            //сохраняем файл если нужно
             if ($this->option('need-file') === 'true') {
                 $this->saveToStorage();
                 $this->info("Файл успешно сохранён: " . $this->getFullStoragePath());
