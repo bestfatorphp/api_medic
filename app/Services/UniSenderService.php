@@ -65,34 +65,16 @@ class UniSenderService
      */
     protected ?string $defaultSenderPhone;
 
-    /**
-     * @param string $apiKey API ключ UniSender
-     * @param string $apiUrl URL API
-     * @param int $retryCount Количество попыток повтора
-     * @param int $retryDelay Задержка между попытками в мс
-     * @param int $timeout Таймаут запроса в секундах
-     * @param string|null $defaultSenderName Имя отправителя по умолчанию
-     * @param string|null $defaultSenderEmail Email отправителя по умолчанию
-     * @param string|null $defaultSenderPhone Телефон отправителя по умолчанию
-     */
-    public function __construct(
-        string $apiKey,
-        string $apiUrl,
-        int $retryCount,
-        int $retryDelay,
-        int $timeout,
-        ?string $defaultSenderName = null,
-        ?string $defaultSenderEmail = null,
-        ?string $defaultSenderPhone = null
-    ) {
-        $this->apiKey = $apiKey;
-        $this->apiUrl = $apiUrl;
-        $this->retryCount = $retryCount;
-        $this->retryDelay = $retryDelay;
-        $this->timeout = $timeout;
-        $this->defaultSenderName = $defaultSenderName;
-        $this->defaultSenderEmail = $defaultSenderEmail;
-        $this->defaultSenderPhone = $defaultSenderPhone;
+
+    public function __construct() {
+        $this->apiKey = config('unisender.api_key');
+        $this->apiUrl = config('unisender.api_url');
+        $this->retryCount = config('unisender.retry_count');
+        $this->retryDelay = config('unisender.retry_delay');
+        $this->timeout = config('unisender.timeout');
+        $this->defaultSenderName = config('unisender.default_sender_name');
+        $this->defaultSenderEmail = config('unisender.default_sender_email');
+        $this->defaultSenderPhone = config('unisender.default_sender_phone');
     }
 
 

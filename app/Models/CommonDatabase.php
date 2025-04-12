@@ -85,6 +85,15 @@ class CommonDatabase extends Model
     }
 
     /**
+     * WhatsApp контакт
+     * @return BelongsTo
+     */
+    public function whatsapp_contact(): BelongsTo
+    {
+        return $this->belongsTo(WhatsAppContact::class, 'phone', 'phone');
+    }
+
+    /**
      * Действия МТ
      * @return HasMany
      */

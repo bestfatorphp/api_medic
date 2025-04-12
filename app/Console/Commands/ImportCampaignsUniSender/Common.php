@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Console\Commands\ImportCampaigns;
+namespace App\Console\Commands\ImportCampaignsUniSender;
 
 use App\Facades\UniSender;
 use App\Models\CommonDatabase;
 use App\Models\UnisenderCampaign;
 use App\Models\UnisenderContact;
+use App\Models\UnisenderParticipation;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -15,15 +16,11 @@ use JetBrains\PhpStorm\NoReturn;
 class Common extends Command
 {
     /**
-     * The name and signature of the console command.
-     *
      * @var string
      */
     protected $signature = 'import:campaigns';
 
     /**
-     * The console command description.
-     *
      * @var string
      */
     protected $description = 'Общий класс для команд импорта кампаний';
@@ -213,7 +210,7 @@ class Common extends Command
 
             //если набралась партия, сохраняем данные
             if (count($batchParticipations) >= self::BATCH_SIZE) {
-                DB::table('unisender_participation')->insertOrIgnore($batchParticipations);
+                UnisenderParticipation::insertOrIgnore($batchParticipations);
                 $batchParticipations = [];
             }
 
@@ -228,7 +225,7 @@ class Common extends Command
 
         //сохраняем оставшиеся данные
         if (!empty($batchParticipations)) {
-            DB::table('unisender_participation')->insertOrIgnore($batchParticipations);
+            UnisenderParticipation::insertOrIgnore($batchParticipations);
         }
         $this->info("Записи добавлены в таблицу unisender_participation.");
 
@@ -245,7 +242,7 @@ class Common extends Command
         $batchSize = 50; //размер партии для обработки
         $totalEmails = count($emails);
         $batchContacts = [];
-        $batchCommonDB = [];
+//        $batchCommonDB = [];
 
         //создаем прогресс-бар
         $progressBar = $this->output->createProgressBar($totalEmails);
@@ -271,15 +268,15 @@ class Common extends Command
                     ];
 
                     //формируем данные для таблицы common_database
-                    $batchCommonDB[] = [
-                        'email' => $email,
-                        'full_name' => $contact['fields']['ФИО'] ?? null,
-                        'city' => $contact['fields']['Город'] ?? null,
-                        'specialty' => $contact['fields']['специальность'] ?? null,
-                        'phone' => $contact['phone']['phone'] ?? null,
-                        'registration_date' => null,
-                        'email_status' => $contact['email']['status'],
-                    ];
+//                    $batchCommonDB[] = [
+//                        'email' => $email,
+//                        'full_name' => $contact['fields']['ФИО'] ?? null,
+//                        'city' => $contact['fields']['Город'] ?? null,
+//                        'specialty' => $contact['fields']['специальность'] ?? null,
+//                        'phone' => $contact['phone']['phone'] ?? null,
+//                        'registration_date' => null,
+//                        'email_status' => $contact['email']['status'],
+//                    ];
                 } catch (\Exception $e) {
                     $this->error("Ошибка при получении данных для email {$email}");
                     Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
@@ -295,10 +292,10 @@ class Common extends Command
                 UnisenderContact::upsert($batchContacts, ['email']);
                 $batchContacts = [];
             }
-            if (!empty($batchCommonDB)) {
-                CommonDatabase::upsert($batchCommonDB, ['email']);
-                $batchCommonDB = [];
-            }
+//            if (!empty($batchCommonDB)) {
+//                CommonDatabase::upsert($batchCommonDB, ['email']);
+//                $batchCommonDB = [];
+//            }
         }
 
         //завершаем прогресс-бар
@@ -307,7 +304,7 @@ class Common extends Command
     }
 
     /**
-     * Рассчитывает процент доставленных писем
+     * Рассчитывает процент
      * @param int $total Общее количество
      * @param int $countSuccess Количество успешных
      *

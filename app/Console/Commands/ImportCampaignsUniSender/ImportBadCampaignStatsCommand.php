@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands\ImportCampaigns;
+namespace App\Console\Commands\ImportCampaignsUniSender;
 
 use App\Models\UnisenderCampaign;
 use Illuminate\Support\Facades\Log;

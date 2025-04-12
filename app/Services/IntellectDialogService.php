@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Validator;
 /**
  * Сервис для работы с API IntellectDialog
  * Документация API: https://api.intellectdialog.com/#webhooks
+ *
+ * Предоставляет полный функционал для:
+ * - Упрвление чатами WhatsApp
  */
 class IntellectDialogService
 {
@@ -32,23 +35,11 @@ class IntellectDialogService
      */
     protected string $apiUrlV2;
 
-    /**
-     * @param string $apiKeyV1 API ключ, версия 1
-     * @param ?string $apiUrlV1 URL API, версия 1.0
-     * @param ?string $apiKeyV2 API ключ, версия 2
-     * @param string $apiUrlV2 URL API, версия 2.0
-     */
-    public function __construct(
-        string $apiKeyV1,
-        ?string $apiUrlV1,
-        ?string $apiKeyV2,
-        string $apiUrlV2,
-    ) {
-        $this->apiKeyV1 = $apiKeyV1;
-        $this->apiUrlV1 = $apiUrlV1;
-        $this->apiKeyV2 = $apiKeyV2;
-        $this->apiUrlV2 = $apiUrlV2;
-
+    public function __construct() {
+        $this->apiKeyV1 = config('intellect-dialog.api_key_v1');
+        $this->apiUrlV1 = config('intellect-dialog.api_url_v1');
+        $this->apiKeyV2 = config('intellect-dialog.api_key_v2');
+        $this->apiUrlV2 = config('intellect-dialog.api_url_v2');
     }
 
     /**
@@ -1756,7 +1747,7 @@ class IntellectDialogService
         try {
             list($token, $baseUrl) = $this->prepareBeforeRequest($isV1Token, $isV1Api);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => $token,
                 'Content-Type' => 'application/json',
             ])->delete($baseUrl . $endpoint, $data);
 
@@ -1786,7 +1777,7 @@ class IntellectDialogService
         try {
             list($token, $baseUrl) = $this->prepareBeforeRequest($isV1Token, $isV1Api);
             $headers = [
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => $token,
             ];
             $client = Http::withHeaders($headers);
 
@@ -1822,7 +1813,7 @@ class IntellectDialogService
         try {
             list($token, $baseUrl) = $this->prepareBeforeRequest($isV1Token, $isV1Api);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => $token,
                 'Content-Type' => 'application/json',
             ])->put($baseUrl . $endpoint, $data);
 
@@ -1851,7 +1842,7 @@ class IntellectDialogService
         try {
             list($token, $baseUrl) = $this->prepareBeforeRequest($isV1Token, $isV1Api);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => $token,
                 'Content-Type' => 'application/json',
             ])->get($baseUrl . $endpoint, $queryParams);
 
@@ -1894,6 +1885,6 @@ class IntellectDialogService
             throw new \Exception("Ошибка: " . $response['error']);
         }
 
-        return !$isList && $response['data'] ? $response['data'] : $response;
+        return !$isList && !empty($response['data']) ? $response['data'] : $response;
     }
 }

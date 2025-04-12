@@ -73,6 +73,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static array webhook()                                                                                           Получить установленный Webhook
  * @method static array setWebhook(string $url, array $events)                                                              Добавить или изменить Webhook
  * @method static array deleteWebhook()                                                                                     Удалить Webhook
+ *
+ * @see \App\Services\IntellectDialogService
  */
 class IntellectDialog extends Facade
 {

@@ -23,7 +23,7 @@ class ImportTelegramUsers extends Command
     /**
      * @var string
      */
-    protected $description = 'Импорт пользователей с обработкой 1M+ записей в ограниченной памяти';
+    protected $description = 'Импорт пользователей Telegram чат-бот, с обработкой 1M+ записей в ограниченной памяти';
 
     /**
      * Путь к временному файлу

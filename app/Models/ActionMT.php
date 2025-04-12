@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 
 /**
@@ -28,4 +29,17 @@ class ActionMT extends Model
     public $timestamps = false;
 
     protected $guarded = ['id'];
+
+    protected $with = [
+      'user_mt'
+    ];
+
+    /**
+     * Пользователь МТ
+     * @return BelongsTo
+     */
+    public function user_mt(): BelongsTo
+    {
+        return $this->belongsTo(UserMT::class, 'mt_user_id');
+    }
 }

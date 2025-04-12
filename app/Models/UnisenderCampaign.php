@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Unisender контакты
+ * Unisender рассылки
  * Class UnisenderCampaign
  * @package App\Models
  *

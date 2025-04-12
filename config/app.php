@@ -233,6 +233,7 @@ return [
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
         'UniSender' => App\Facades\UniSender::class,
         'IntellectDialog' => App\Facades\IntellectDialog::class,
+        'IqSms' => App\Facades\IqSmsFacade::class,
     ],
 
 ];

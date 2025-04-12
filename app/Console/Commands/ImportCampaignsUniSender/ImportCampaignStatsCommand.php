@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands\ImportCampaigns;
+namespace App\Console\Commands\ImportCampaignsUniSender;
 
 use App\Facades\UniSender;
 use Carbon\Carbon;
@@ -12,14 +12,14 @@ class ImportCampaignStatsCommand extends Common
     /**
      * @var string
      */
-    protected $signature = 'import:campaigns-stats
+    protected $signature = 'import:us-campaigns
                             {--from= : Начальная дата в формате DD.MM.YYYY}
                             {--to= : Конечная дата в формате DD.MM.YYYY}';
 
     /**
      * @var string
      */
-    protected $description = 'Сбор детализированной статистики по email-рассылкам';
+    protected $description = 'Сбор детализированной статистики UniSender по рассылкам';
 
     /**
      * Лимит количества кампаний за один запрос к API (пагинация).

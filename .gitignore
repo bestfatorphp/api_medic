@@ -14,3 +14,5 @@ yarn-error.log
 /.idea
 /.vscode
 Dockerfile
+app/Console/Commands/TestIntelectDialogApi.php
+app/Console/Commands/ImportUsersMTFromCsv.php

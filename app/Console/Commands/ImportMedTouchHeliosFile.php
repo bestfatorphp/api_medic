@@ -2,6 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Logging\CustomLog;
+use App\Models\ActionMT;
+use App\Models\ActivityMT;
+use App\Models\UserMT;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +24,8 @@ class ImportMedTouchHeliosFile extends Command
      */
     protected $signature = 'import:medtouch-helios
                             {--chunk=5 : Размер чанка скачивания в MB}
-                            {--timeout=120 : Таймаут ожидания в секундах}';
+                            {--timeout=120 : Таймаут ожидания в секундах}
+                            {--need-file=false : Сохранять ли CSV файл}';
 
     /**
      * Описание команды.
@@ -98,19 +104,26 @@ class ImportMedTouchHeliosFile extends Command
             $this->logMemory('Начало выполнения');
             $fileUrl = $this->getTargetUrl();
             $this->info("Используется URL: " . $fileUrl);
-
             $client = $this->initBrowser();
             $downloadUrl = $this->extractDownloadUrl($client, $fileUrl);
-
             $this->info("URL для скачивания: " . $downloadUrl);
-            $this->downloadAndSave($downloadUrl);
 
-            $this->info("Файл успешно сохранён: " . $this->getFullStoragePath());
+            //скачиваем файл
+            $this->downloadCsv($downloadUrl);
+            //обрабатываем CSV
+            $this->processCsv();
+
+            //удаляем временный файл если не нужно сохранять
+            if ($this->option('need-file') === 'true') {
+                $this->saveToStorage();
+                $this->info("Файл успешно сохранён: " . $this->getFullStoragePath());
+            }
+
             $this->logMemory('Завершение выполнения');
-
             return CommandAlias::SUCCESS;
-        } catch (Throwable $e) {
-            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
+        } catch (\Exception $e) {
+//            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
+            CustomLog::errorLog('ImportMedTouchHeliosFile', 'commands', $e);
             $this->error('Ошибка выполнения, смотрите логи');
             return CommandAlias::FAILURE;
         } finally {
@@ -271,64 +284,167 @@ class ImportMedTouchHeliosFile extends Command
     }
 
     /**
-     * Скачиваем файл по частям и сохраняем во временное хранилище.
-     * @param string $downloadUrl URL для скачивания файла
+     * @param string $downloadUrl
      * @throws \Exception
      */
-    private function downloadAndSave(string $downloadUrl): void
+    private function downloadCsv(string $downloadUrl): void
     {
         $this->info("Начало скачивания файла...");
         $this->logMemory('Перед скачиванием');
-
-        //создаем временный файл для потоковой записи
         $this->tmpFilePath = tempnam(sys_get_temp_dir(), 'medtouth_temp_');
         if ($this->tmpFilePath === false) {
             throw new \Exception('Не удалось создать временный файл');
         }
-
         $chunkSize = $this->option('chunk') * 1024 * 1024;
-
-        try {
-            $source = fopen($downloadUrl, 'r');
-            if (!$source) {
-                throw new \Exception("Не удалось открыть поток для скачивания");
-            }
-
-            $dest = fopen($this->tmpFilePath, 'w');
-            if (!$dest) {
-                throw new \Exception("Не удалось создать временный файл");
-            }
-
-            $downloaded = 0;
-            while (!feof($source)) {
-                $this->checkMemoryUsage();
-                $chunk = fread($source, $chunkSize);
-                fwrite($dest, $chunk);
-                $downloaded += strlen($chunk);
-
-                if ($downloaded % (5 * 1024 * 1024) == 0) {
-                    $this->info("Скачано: " . $this->formatBytes($downloaded));
-                }
-            }
-
-            $this->info("Всего скачано: " . $this->formatBytes($downloaded));
-            fclose($source);
-            fclose($dest);
-
-            $this->saveToStorage($this->tmpFilePath);
-
-        } finally {
-            if (file_exists($this->tmpFilePath)) {
-                unlink($this->tmpFilePath);
+        $source = fopen($downloadUrl, 'r');
+        if (!$source) {
+            throw new \Exception("Не удалось открыть поток для скачивания");
+        }
+        $dest = fopen($this->tmpFilePath, 'w');
+        if (!$dest) {
+            throw new \Exception("Не удалось создать временный файл");
+        }
+        $downloaded = 0;
+        while (!feof($source)) {
+            $this->checkMemoryUsage();
+            $chunk = fread($source, $chunkSize);
+            fwrite($dest, $chunk);
+            $downloaded += strlen($chunk);
+            if ($downloaded % (5 * 1024 * 1024) == 0) {
+                $this->info("Скачано: " . $this->formatBytes($downloaded));
             }
         }
+        $this->info("Всего скачано: " . $this->formatBytes($downloaded));
+        fclose($source);
+        fclose($dest);
     }
 
     /**
-     * Сохраняем временный файл в постоянное хранилище.
-     * @param string $tempFilePath Путь к временному файлу
+     * Орабатываем данные и запичываем в БД активность пользователей
+     * @throws \Exception
      */
-    private function saveToStorage(string $tempFilePath): void
+    private function processCsv(): void
+    {
+        $handle = fopen($this->tmpFilePath, 'r');
+        if (!$handle) {
+            throw new \Exception("Не удалось открыть CSV файл");
+        }
+
+        $currentUser = null;
+        $batchSize = 500;
+        $validActivityTypes = ['Лонгрид', 'Мероприятие', 'Видеовизит', 'Квиз'];
+        $actionsToInsert = [];
+
+        try {
+            while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
+                //проверяем строку с данными пользователя
+                if (strpos($row[0], 'ID пользователя') === 0) {
+                    if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
+                        $userBitrixId = $matches[1];
+                        $email = trim($matches[2]);
+
+                        $currentUser = UserMT::where('email', $email)->first();
+                    } else {
+                        Log::warning("Некорректная строка с пользователем: " . json_encode($row));
+                        $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
+                    }
+                    continue;
+                }
+
+                //пропускаем строки без пользователя
+                if (!$currentUser) {
+                    $this->warn("Пропущена строка без текущего пользователя: " . implode("; ", $row));
+                    continue;
+                }
+
+                if (empty($row[0])) {
+                    continue; //пустая строка
+                }
+
+                //проверяем допустимый тип активности
+                $activityType = $row[0];
+                if (!in_array($activityType, $validActivityTypes)) {
+                    $this->warn("Пропущена строка с неизвестным типом активности: {$activityType}");
+                    continue;
+                }
+
+                $dateTime = $this->parseDateTime($row[2] ?? '');
+
+                //парсим активность
+                $activityData = [
+                    'type' => $activityType,
+                    'name' => $row[1] ?? '',
+                    'date_time' => $dateTime,
+                ];
+
+                /** @var ActivityMT $activity */
+                $activity = ActivityMT::firstOrCreate([
+                    'type' => $activityData['type'],
+                    'name' => $activityData['name'],
+                    'date_time' => $dateTime,
+                ], $activityData);
+
+                //парсим duration (продолжительность)
+                $durationInSeconds = floatval(str_replace(',', '.', str_replace('не передаются данные по продолжительности', '0', $row[3] ?? '')));
+                $durationInMinutes = round($durationInSeconds / 60, 4); //преобразуем в минуты с округлением до 4 знаков
+
+                //парсим результат
+                $result = 0;
+                if ($activityType !== 'Квиз') {
+                    $result = floatval(str_replace(',', '.', str_replace(['%', 'Просмотрено ', 'процентов'], '', $row[4] ?? '')));
+                }
+
+                $actionsToInsert[] = [
+                    'mt_user_id' => $currentUser->id,
+                    'activity_id' => $activity->id,
+                    'date_time' => $activity->date_time,
+                    'duration' => $durationInMinutes,
+                    'result' => $result,
+                ];
+
+                if (count($actionsToInsert) >= $batchSize) {
+                    ActionMT::insertOrIgnore($actionsToInsert);
+                    $actionsToInsert = [];
+                }
+            }
+
+            //вставляем оставшиеся записи
+            if (!empty($actionsToInsert)) {
+                ActionMT::insertOrIgnore($actionsToInsert);
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        $this->info("Обработка CSV завершена.");
+    }
+
+    /**
+     * Парсит дату из строки в формате 'd.m.Y H:i:s'.
+     * Если дата некорректна, возвращает значение по умолчанию ('1970-01-01 00:00:00').
+     * Значение по умолчанию - заглушка, чтобы при пакетном сохранении общий уникальный индекс не менял значение (такое происходит, если будет присвоено null)
+     * @param string|null $dateString
+     * @return string
+     */
+    private function parseDateTime(?string $dateString): string
+    {
+        $default = '1970-01-01 00:00:00';
+        if (empty($dateString)) {
+            return $default;
+        }
+
+        try {
+            return Carbon::createFromFormat('d.m.Y H:i:s', $dateString)->toDateTimeString();
+        } catch (\Exception $e) {
+            return $default;
+        }
+    }
+
+
+    /**
+     * Сохраняем временный файл в постоянное хранилище.
+     */
+    private function saveToStorage(): void
     {
         $this->info("Сохранение файла в хранилище...");
 
@@ -338,7 +454,7 @@ class ImportMedTouchHeliosFile extends Command
 
         Storage::put(
             self::STORAGE_PATH . self::TARGET_FILENAME,
-            fopen($tempFilePath, 'r')
+            fopen($this->tmpFilePath, 'r')
         );
     }
 
