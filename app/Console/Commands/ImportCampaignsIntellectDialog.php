@@ -24,7 +24,7 @@ class ImportCampaignsIntellectDialog extends Command
      * Описание команды.
      * @var string
      */
-    protected $description = 'Сбор детализированной статистики IntellectDialog WhatsUp по рассылкам';
+    protected $description = 'Сбор детализированной статистики по WhatsApp рассылкам (IntellectDialog api)';
 
     /**
      * @return void
