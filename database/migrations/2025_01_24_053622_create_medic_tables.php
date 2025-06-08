@@ -62,6 +62,8 @@ class CreateMedicTables extends Migration
             $table->string('uf_utm_term')->nullable()->comment('utm метка');
             $table->string('uf_utm_campaign')->nullable()->comment('utm метка');
             $table->string('uf_utm_content')->nullable()->comment('utm метка');
+
+            $table->index('email');
         });
 
         //Действия МТ
@@ -159,6 +161,8 @@ class CreateMedicTables extends Migration
             $table->string('verification_status')->nullable()->comment('Статус верификации');
             $table->boolean('pharma')->default(false)->comment('Фарма');
             $table->string('email_status')->nullable()->comment('Статус e-mail');
+
+            $table->index('email');
         });
 
         //Парсинг PD

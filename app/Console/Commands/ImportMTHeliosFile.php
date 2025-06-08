@@ -16,7 +16,7 @@ use Symfony\Component\Panther\Client;
 use Throwable;
 
 //todo: Перед использованием, установки на сервере для Panther
-class ImportMedTouchHeliosFile extends Command
+class ImportMTHeliosFile extends Command
 {
     /**
      * Пример: php artisan import:medtouch-helios --chunk=5 --timeout=60
@@ -123,7 +123,7 @@ class ImportMedTouchHeliosFile extends Command
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
 //            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
-            CustomLog::errorLog('ImportMedTouchHeliosFile', 'commands', $e);
+            CustomLog::errorLog('ImportMTHeliosFile', 'commands', $e);
             $this->error('Ошибка выполнения, смотрите логи');
             return CommandAlias::FAILURE;
         } finally {

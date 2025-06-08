@@ -242,7 +242,7 @@ class Common extends Command
         $batchSize = 50; //размер партии для обработки
         $totalEmails = count($emails);
         $batchContacts = [];
-//        $batchCommonDB = [];
+        $batchCommonDB = [];
 
         //создаем прогресс-бар
         $progressBar = $this->output->createProgressBar($totalEmails);
@@ -268,15 +268,15 @@ class Common extends Command
                     ];
 
                     //формируем данные для таблицы common_database
-//                    $batchCommonDB[] = [
-//                        'email' => $email,
-//                        'full_name' => $contact['fields']['ФИО'] ?? null,
-//                        'city' => $contact['fields']['Город'] ?? null,
-//                        'specialty' => $contact['fields']['специальность'] ?? null,
-//                        'phone' => $contact['phone']['phone'] ?? null,
-//                        'registration_date' => null,
-//                        'email_status' => $contact['email']['status'],
-//                    ];
+                    $batchCommonDB[] = [
+                        'email' => $email,
+                        'full_name' => $contact['fields']['ФИО'] ?? null,
+                        'city' => $contact['fields']['Город'] ?? null,
+                        'specialty' => $contact['fields']['специальность'] ?? null,
+                        'phone' => $contact['phone']['phone'] ?? null,
+                        'registration_date' => null,
+                        'email_status' => $contact['email']['status'],
+                    ];
                 } catch (\Exception $e) {
                     $this->error("Ошибка при получении данных для email {$email}");
                     Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
@@ -292,10 +292,10 @@ class Common extends Command
                 UnisenderContact::upsert($batchContacts, ['email']);
                 $batchContacts = [];
             }
-//            if (!empty($batchCommonDB)) {
-//                CommonDatabase::upsert($batchCommonDB, ['email']);
-//                $batchCommonDB = [];
-//            }
+            if (!empty($batchCommonDB)) { //вот здесь может быть конфликт перед пакетной вставкой
+                CommonDatabase::upsert($batchCommonDB, ['email']);
+                $batchCommonDB = [];
+            }
         }
 
         //завершаем прогресс-бар

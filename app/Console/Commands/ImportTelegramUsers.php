@@ -41,12 +41,11 @@ class ImportTelegramUsers extends Command
         DB::disableQueryLog(); //отключаем логирование запросов
 
         try {
-            $this->info('[' . date('Y-m-d H:i:s') . '] Начало импорта');
+            $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
 
             //основной процесс обработки данных
             $this->processStream();
-
-            $this->info(PHP_EOL . '[' . date('Y-m-d H:i:s') . '] Импорт завершен');
+            $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
             CustomLog::errorLog(__CLASS__, 'commands', $e);
