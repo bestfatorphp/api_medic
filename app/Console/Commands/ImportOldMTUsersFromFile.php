@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Перед использованием, поместить файл по пути storage/app/additional/contacts_other_sources.csv
+ */
 class ImportOldMTUsersFromFile extends Command
 {
     protected $signature = 'import:old-mt-users

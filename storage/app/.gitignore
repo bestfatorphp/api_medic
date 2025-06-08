@@ -1,3 +1,6 @@
 *
+!additional/
+!private/
 !public/
+!logs/
 !.gitignore
