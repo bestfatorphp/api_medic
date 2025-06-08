@@ -41,15 +41,9 @@ class ImportOldMTUsersFromFile extends Command
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
-            // Логирование ошибки в специальный канал
             CustomLog::errorLog(__CLASS__, 'commands', $e);
             $this->error('Ошибка выполнения, смотрите логи');
             return CommandAlias::FAILURE;
-        } finally {
-            // Гарантированное удаление временного файла при любом исходе
-            if (isset($this->tmpFilePath) && file_exists($this->tmpFilePath)) {
-                unlink($this->tmpFilePath);
-            }
         }
     }
 
