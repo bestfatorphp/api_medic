@@ -3,17 +3,20 @@
 namespace App\Console\Commands;
 
 use App\Facades\IntellectDialog;
+use App\Logging\CustomLog;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppContact;
 use App\Models\WhatsAppParticipation;
+use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
 class ImportCampaignsIntellectDialog extends Command
 {
+    use WriteLockTrait;
+
     /**
      * @var string
      */
@@ -59,7 +62,7 @@ class ImportCampaignsIntellectDialog extends Command
             $this->info('Сбор статистики завершен успешно');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
-            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
+            CustomLog::errorLog(__CLASS__, 'commands', $e);
             $this->error("Ошибка: " . $e->getMessage());
             return CommandAlias::FAILURE;
         }
@@ -141,7 +144,7 @@ class ImportCampaignsIntellectDialog extends Command
 
             $offset += self::LIMIT;
             unset($messages);
-            gc_collect_cycles();
+            gc_mem_caches(); //очищаем кэши памяти Zend Engine
 
         } while ($fetchedCount === self::LIMIT);
 

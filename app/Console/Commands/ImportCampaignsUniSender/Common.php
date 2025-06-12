@@ -7,6 +7,7 @@ use App\Models\CommonDatabase;
 use App\Models\UnisenderCampaign;
 use App\Models\UnisenderContact;
 use App\Models\UnisenderParticipation;
+use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,8 @@ use JetBrains\PhpStorm\NoReturn;
 
 class Common extends Command
 {
+    use WriteLockTrait;
+
     /**
      * @var string
      */
@@ -239,7 +242,7 @@ class Common extends Command
      */
     private function fetchContactsInBatches(array $emails): void
     {
-        $batchSize = 50; //размер партии для обработки
+        $batchSize = 500; //размер партии для обработки
         $totalEmails = count($emails);
         $batchContacts = [];
         $batchCommonDB = [];
@@ -278,8 +281,7 @@ class Common extends Command
                         'email_status' => $contact['email']['status'],
                     ];
                 } catch (\Exception $e) {
-                    $this->error("Ошибка при получении данных для email {$email}");
-                    Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
+                    Log::channel('commands')->error(__CLASS__ . "Ошибка при получении данных для email {$email}. Error: " . $e->getMessage());
                     continue; //пропускаем email, если произошла ошибка
                 }
 
@@ -292,8 +294,10 @@ class Common extends Command
                 UnisenderContact::upsert($batchContacts, ['email']);
                 $batchContacts = [];
             }
-            if (!empty($batchCommonDB)) { //вот здесь может быть конфликт перед пакетной вставкой
-                CommonDatabase::upsert($batchCommonDB, ['email']);
+            if (!empty($batchCommonDB)) {
+                $this->withTableLock('common_database', function () use ($batchCommonDB) {
+                    CommonDatabase::upsert($batchCommonDB, ['email']);
+                });
                 $batchCommonDB = [];
             }
         }

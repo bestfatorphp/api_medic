@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
 use App\Models\UserMT;
+use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -16,8 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ImportOldMTUsersFromFile extends Command
 {
+    use WriteLockTrait;
+
     protected $signature = 'import:old-mt-users
-                          {--chunk=200 : Количество записей за одну транзакцию}';
+                          {--chunk=1000 : Количество записей за одну транзакцию}';
 
     protected $description = 'Импорт пользователей старого сайта МедТач, с обработкой 1M+ записей в ограниченной памяти';
 
@@ -27,8 +30,7 @@ class ImportOldMTUsersFromFile extends Command
     private string $filePath = 'additional/contacts_other_sources.csv';
 
     /**
-     * Основной метод выполнения команды
-     * @return int Код возврата (0 - успех, 1 - ошибка)
+     * @return int
      */
     public function handle(): int
     {
@@ -129,7 +131,7 @@ class ImportOldMTUsersFromFile extends Command
             }
 
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                Log::channel('commands')->warning("Не валидный email: {$email}");
+//                Log::channel('commands')->warning("Не валидный email: {$email}");
                 $stats['skipped']++;
                 $progressBar->advance();
                 continue;
@@ -198,8 +200,8 @@ class ImportOldMTUsersFromFile extends Command
 
     /**
      * Подготовка данных для таблицы users_mt
-     * @param array $record Строка данных из CSV
-     * @return array Подготовленные данные для вставки
+     * @param array $record         Строка данных из CSV
+     * @return array                Подготовленные данные для вставки
      */
     protected function prepareUsersMtData(array $record): array
     {
@@ -215,8 +217,8 @@ class ImportOldMTUsersFromFile extends Command
 
     /**
      * Подготовка данных для таблицы common_database
-     * @param array $record Строка данных из CSV
-     * @return array Подготовленные данные для вставки
+     * @param array $record         Строка данных из CSV
+     * @return array                Подготовленные данные для вставки
      */
     protected function prepareCommonDatabaseData(array $record): array
     {
@@ -232,9 +234,9 @@ class ImportOldMTUsersFromFile extends Command
 
     /**
      * Обновление существующей записи в users_mt
-     * @param object $existingRecord Существующая запись из БД
-     * @param array $newData Новые данные из CSV
-     * @param array $stats Ссылка на массив статистики для обновления
+     * @param object $existingRecord        Существующая запись из БД
+     * @param array $newData                Новые данные из CSV
+     * @param array $stats                  Ссылка на массив статистики для обновления
      */
     protected function updateUsersMt(object $existingRecord, array $newData, array &$stats): void
     {
@@ -254,9 +256,9 @@ class ImportOldMTUsersFromFile extends Command
 
     /**
      * Обновление существующей записи в common_database
-     * @param object $existingRecord Существующая запись из БД
-     * @param array $newData Новые данные из CSV
-     * @param array $stats Ссылка на массив статистики для обновления
+     * @param object $existingRecord            Существующая запись из БД
+     * @param array $newData                    Новые данные из CSV
+     * @param array $stats                      Ссылка на массив статистики для обновления
      */
     protected function updateCommonDatabase(object $existingRecord, array $newData, array &$stats): void
     {
@@ -320,7 +322,9 @@ class ImportOldMTUsersFromFile extends Command
 
                 //вставляем только новые записи
                 if (!empty($newUsers)) {
-                    UserMT::query()->insert($newUsers);
+                    $this->withTableLock('users_mt', function () use ($newUsers) {
+                        UserMT::upsert($newUsers, ['email']);
+                    });
                     $stats['users_mt']['created'] += count($newUsers);  //обновляем статистику
                 }
 
@@ -348,7 +352,9 @@ class ImportOldMTUsersFromFile extends Command
 
                 //вставляем только новые записи
                 if (!empty($newCommon)) {
-                    CommonDatabase::query()->insert($newCommon);
+                    $this->withTableLock('common_database', function () use ($newCommon) {
+                        CommonDatabase::upsert($newCommon, ['email']);
+                    });
                     $stats['common_database']['created'] += count($newCommon);
                 }
 
@@ -357,6 +363,10 @@ class ImportOldMTUsersFromFile extends Command
         });
 
         //чистим память
-        gc_collect_cycles();
+        $usersMtBatch = [];
+        $commonDbBatch = [];
+        $existingUsersCache = [];
+        $existingCommonCache = [];
+        gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 }

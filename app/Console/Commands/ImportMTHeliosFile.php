@@ -6,6 +6,7 @@ use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\UserMT;
+use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -13,11 +14,12 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Symfony\Component\Panther\Client;
-use Throwable;
 
 //todo: Перед использованием, установки на сервере для Panther
 class ImportMTHeliosFile extends Command
 {
+    use WriteLockTrait;
+
     /**
      * Пример: php artisan import:medtouch-helios --chunk=5 --timeout=60
      * @var string
@@ -122,8 +124,7 @@ class ImportMTHeliosFile extends Command
             $this->logMemory('Завершение выполнения');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
-//            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
-            CustomLog::errorLog('ImportMTHeliosFile', 'commands', $e);
+            CustomLog::errorLog(__CLASS__, 'commands', $e);
             $this->error('Ошибка выполнения, смотрите логи');
             return CommandAlias::FAILURE;
         } finally {
@@ -331,9 +332,10 @@ class ImportMTHeliosFile extends Command
         }
 
         $currentUser = null;
-        $batchSize = 500;
+        $batchSize = 1000;
         $validActivityTypes = ['Лонгрид', 'Мероприятие', 'Видеовизит', 'Квиз'];
         $actionsToInsert = [];
+        $countBatchInsert = 0;
 
         try {
             while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
@@ -342,8 +344,12 @@ class ImportMTHeliosFile extends Command
                     if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
                         $userBitrixId = $matches[1];
                         $email = trim($matches[2]);
-
-                        $currentUser = UserMT::where('email', $email)->first();
+                        $currentUser = $this->withTableLock('users_mt', function () use ($email) {
+                            return UserMT::firstOrCreate(
+                                ['email' => $email],
+                                ['email' => $email]
+                            );
+                        });
                     } else {
                         Log::warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
@@ -386,7 +392,7 @@ class ImportMTHeliosFile extends Command
 
                 //парсим duration (продолжительность)
                 $durationInSeconds = floatval(str_replace(',', '.', str_replace('не передаются данные по продолжительности', '0', $row[3] ?? '')));
-                $durationInMinutes = round($durationInSeconds / 60, 4); //преобразуем в минуты с округлением до 4 знаков
+                $durationInMinutes = round($durationInSeconds / 60, 2); //преобразуем в минуты с округлением до 2-х знаков
 
                 //парсим результат
                 $result = 0;
@@ -403,13 +409,19 @@ class ImportMTHeliosFile extends Command
                 ];
 
                 if (count($actionsToInsert) >= $batchSize) {
+                    ++$countBatchInsert;
+                    $this->info("Пакетная вставка - $countBatchInsert");
                     ActionMT::insertOrIgnore($actionsToInsert);
                     $actionsToInsert = [];
+                    gc_mem_caches(); //очищаем кэши памяти Zend Engine
+
                 }
             }
 
             //вставляем оставшиеся записи
             if (!empty($actionsToInsert)) {
+                ++$countBatchInsert;
+                $this->info("Пакетная вставка - $countBatchInsert");
                 ActionMT::insertOrIgnore($actionsToInsert);
             }
         } finally {

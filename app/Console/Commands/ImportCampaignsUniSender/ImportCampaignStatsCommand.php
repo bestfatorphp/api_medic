@@ -3,8 +3,8 @@
 namespace App\Console\Commands\ImportCampaignsUniSender;
 
 use App\Facades\UniSender;
+use App\Logging\CustomLog;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
 class ImportCampaignStatsCommand extends Common
@@ -61,8 +61,8 @@ class ImportCampaignStatsCommand extends Common
             $this->info('Сбор статистики завершен успешно');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
-            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             $this->error("Ошибка: " . $e->getMessage());
+            CustomLog::errorLog(__CLASS__, 'commands', $e);
             return CommandAlias::FAILURE;
         } finally {
             //убедимся, что временный файл удален даже в случае ошибки
@@ -106,7 +106,7 @@ class ImportCampaignStatsCommand extends Common
             $offset += self::LIMIT;
             //освобождаем память
             unset($campaigns);
-            gc_collect_cycles();
+            gc_mem_caches(); //очищаем кэши памяти Zend Engine
 
         } while ($fetchedCount === self::LIMIT);
     }

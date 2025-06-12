@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Logging\CustomLog;
 use App\Models\UserMT;
+use App\Traits\WriteLockTrait;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\Http;
@@ -13,12 +14,14 @@ use Symfony\Component\Console\Helper\ProgressBar;
 
 class ImportTelegramUsers extends Command
 {
+    use WriteLockTrait;
+
     /**
      * Пример: php artisan import:telegram-users --chunk=1000
      * @var string
      */
     protected $signature = 'import:telegram-users
-                          {--chunk=1000 : Количество записей за одну транзакцию}';
+                          {--chunk=500 : Количество записей за одну транзакцию}';
 
     /**
      * @var string
@@ -120,7 +123,7 @@ class ImportTelegramUsers extends Command
             if (count($batch) >= $this->option('chunk')) {
                 $this->processBatch($batch, $progressBar);
                 $batch = []; //чистим пакет
-                gc_collect_cycles(); //принудительно очистим память
+                gc_mem_caches(); //очищаем кэши памяти Zend Engine
             }
         }
 
@@ -159,45 +162,51 @@ class ImportTelegramUsers extends Command
                 $fullName = $record['full_name'] ?? null;
 
                 /** @var UserMT $user */
-                $user = UserMT::firstOrNew(['email' => $email]);
-                if (!$user->exists) {
-                    $user->fill([
-                        'full_name' => $fullName,
-                        'registration_date' => $registrationDate
-                    ]);
-                    $user->save();
-                }
+                $user = $this->withTableLock('users_mt', function () use ($email, $fullName, $registrationDate) {
+                    $user = UserMT::firstOrNew(['email' => $email]);
+
+                    if (!$user->exists) {
+                        $user->fill([
+                            'full_name' => $fullName,
+                            'registration_date' => $registrationDate
+                        ]);
+                        $user->save();
+                    }
+                    return $user;
+                });
 
                 $newSpecialization = $record['specialization'] ?? null;
                 if (!$newSpecialization) {
                     continue; //пропускаем записи без specialization
                 }
 
-                if ($user->common_database) {
-                    $current = $user->common_database->specialization ?? '';
+                $this->withTableLock('common_database', function () use ($user, $record, $newSpecialization, $fullName, $registrationDate) {
+                    if ($user->common_database) {
+                        $current = $user->common_database->specialization ?? '';
 
-                    $values = array_map('trim', explode(',', $current));
+                        $values = array_map('trim', explode(',', $current));
 
-                    if (!in_array($newSpecialization, $values)) {
-                        //через запятую, новые значения
-                        $updated = $current === ''
-                            ? $newSpecialization
-                            : $current . ',' . $newSpecialization;
+                        if (!in_array($newSpecialization, $values)) {
+                            //через запятую, новые значения
+                            $updated = $current === ''
+                                ? $newSpecialization
+                                : $current . ',' . $newSpecialization;
 
-                        if ($user->common_database->specialization !== $updated) {
-                            $user->common_database()->update(['specialization' => $updated]);
+                            if ($user->common_database->specialization !== $updated) {
+                                $user->common_database()->update(['specialization' => $updated]);
+                            }
                         }
+                    } else {
+                        $user->common_database()->create([
+                            'mt_user_id' => $user->id,
+                            'full_name' => $fullName,
+                            'username' => $record['username'] ?? null,
+                            'specialization' => $newSpecialization,
+                            'acquisition_tool' => $record['channel'] ?? null,
+                            'registration_date' => $registrationDate
+                        ]);
                     }
-                } else {
-                    $user->common_database()->create([
-                        'mt_user_id' => $user->id,
-                        'full_name' => $fullName,
-                        'username' => $record['username'] ?? null,
-                        'specialization' => $newSpecialization,
-                        'acquisition_tool' => $record['channel'] ?? null,
-                        'registration_date' => $registrationDate
-                    ]);
-                }
+                });
             }
         });
 

@@ -15,4 +15,4 @@ yarn-error.log
 /.vscode
 Dockerfile
 app/Console/Commands/TestIntelectDialogApi.php
-app/Console/Commands/ImportUsersMTFromCsv.php
+app/Console/Commands/MonitorMemoryUsage.php
