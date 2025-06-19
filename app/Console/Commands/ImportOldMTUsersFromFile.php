@@ -40,8 +40,6 @@ class ImportOldMTUsersFromFile extends Command
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
-
-            //основной процесс обработки данных
             $this->processData();
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -92,10 +90,6 @@ class ImportOldMTUsersFromFile extends Command
         //наш чанк
         $chunkSize = (int)$this->option('chunk');
 
-        //кэши для хранения информации о существующих записях
-        $existingUsersCache = [];
-        $existingCommonCache = [];
-
         //построчно читаем CSV файл
         while (!feof($file)) {
             //читаем строку
@@ -131,7 +125,7 @@ class ImportOldMTUsersFromFile extends Command
             }
 
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-//                Log::channel('commands')->warning("Не валидный email: {$email}");
+                Log::channel('commands')->warning("Не валидный email: {$email}");
                 $stats['skipped']++;
                 $progressBar->advance();
                 continue;
@@ -141,40 +135,13 @@ class ImportOldMTUsersFromFile extends Command
             $usersMtData = $this->prepareUsersMtData($record);
             $commonDbData = $this->prepareCommonDatabaseData($record);
 
-            //проверка существования записей через кэш
-            $existingUsersMt = $existingUsersCache[$email] ?? null;
-            $existingCommonDb = $existingCommonCache[$email] ?? null;
+            $usersMtBatch[] = $usersMtData;
+            $commonDbBatch[] = $commonDbData;
 
-            //проверка в текущем батче (если запись еще не вставлена в БД)
-            if (!$existingUsersMt && count($usersMtBatch) > 0) {
-                foreach ($usersMtBatch as $user) {
-                    if ($user['email'] === $email) {
-                        $existingUsersMt = (object)['email' => $email];
-                        break;
-                    }
-                }
-            }
-
-            //обработка существующих/новых записей для users_mt
-            if ($existingUsersMt) {
-                $this->updateUsersMt($existingUsersMt, $usersMtData, $stats);
-                $commonDbData['mt_user_id'] = $existingUsersMt->id ?? null;
-            } else {
-                $usersMtBatch[] = $usersMtData;
-            }
-
-            //обработка существующих/новых записей для common_database
-            if ($existingCommonDb) {
-                $this->updateCommonDatabase($existingCommonDb, $commonDbData, $stats);
-            } elseif (!$existingUsersMt) {
-                $commonDbBatch[] = $commonDbData;
-            }
 
             //обработка пакета при достижении лимита
             if ($stats['processed'] % $chunkSize === 0) {
-                $this->processBatchWithCache($usersMtBatch, $commonDbBatch, $stats, $existingUsersCache, $existingCommonCache);
-                $existingUsersCache = [];
-                $existingCommonCache = [];
+                $this->processBatch($usersMtBatch, $commonDbBatch, $stats);
             }
 
             $progressBar->advance();
@@ -182,7 +149,7 @@ class ImportOldMTUsersFromFile extends Command
 
         //обработка последнего неполного пакета
         if (!empty($usersMtBatch) || !empty($commonDbBatch)) {
-            $this->processBatchWithCache($usersMtBatch, $commonDbBatch, $stats, $existingUsersCache, $existingCommonCache);
+            $this->processBatch($usersMtBatch, $commonDbBatch, $stats);
         }
 
         fclose($file);
@@ -233,65 +200,17 @@ class ImportOldMTUsersFromFile extends Command
     }
 
     /**
-     * Обновление существующей записи в users_mt
-     * @param object $existingRecord        Существующая запись из БД
-     * @param array $newData                Новые данные из CSV
-     * @param array $stats                  Ссылка на массив статистики для обновления
-     */
-    protected function updateUsersMt(object $existingRecord, array $newData, array &$stats): void
-    {
-        $updateData = [];
-
-        foreach ($newData as $key => $value) {
-            if ($value !== null && (empty($existingRecord->$key) || $existingRecord->$key === '')) {
-                $updateData[$key] = $value;
-            }
-        }
-
-        if (!empty($updateData)) {
-            UserMT::query()->where('id', $existingRecord->id)->update($updateData);
-            $stats['users_mt']['updated']++;
-        }
-    }
-
-    /**
-     * Обновление существующей записи в common_database
-     * @param object $existingRecord            Существующая запись из БД
-     * @param array $newData                    Новые данные из CSV
-     * @param array $stats                      Ссылка на массив статистики для обновления
-     */
-    protected function updateCommonDatabase(object $existingRecord, array $newData, array &$stats): void
-    {
-        $updateData = [];
-
-        foreach ($newData as $key => $value) {
-            if ($value !== null && (empty($existingRecord->$key) || $existingRecord->$key === '')) {
-                $updateData[$key] = $value;
-            }
-        }
-
-        if (!empty($updateData)) {
-            CommonDatabase::query()->where('id', $existingRecord->id)->update($updateData);
-            $stats['common_database']['updated']++;
-        }
-    }
-
-    /**
-     * Пакетная обработка данных с использованием кэша
+     * Пакетная обработка данных
      * @param array &$usersMtBatch          Ссылка на батч данных для users_mt
      * @param array &$commonDbBatch         Ссылка на батч данных для common_database
      * @param array &$stats                 Ссылка на статистику выполнения
-     * @param array &$existingUsersCache    Ссылка на кэш существующих пользователей
-     * @param array &$existingCommonCache   Ссылка на кэш common_database
      */
-    protected function processBatchWithCache(
+    protected function processBatch(
         array &$usersMtBatch,
         array &$commonDbBatch,
-        array &$stats,
-        array &$existingUsersCache,
-        array &$existingCommonCache
+        array &$stats
     ): void {
-        DB::transaction(function () use (&$usersMtBatch, &$commonDbBatch, &$stats, &$existingUsersCache, &$existingCommonCache) {
+        DB::transaction(function () use (&$usersMtBatch, &$commonDbBatch, &$stats) {
             if (!empty($usersMtBatch)) {
                 //получаем все email из текущего пакета
                 $emails = array_column($usersMtBatch, 'email');
@@ -308,49 +227,61 @@ class ImportOldMTUsersFromFile extends Command
                     ->get()
                     ->keyBy('email');
 
-                // Обновляем кэш существующих записей
-                foreach ($existingUsers as $email => $user) {
-                    $existingUsersCache[$email] = $user;
+                //обрабатываем users_mt
+                $newUsers = [];
+                foreach ($usersMtBatch as $user) {
+                    if (isset($existingUsers[$user['email']])) {
+                        //обновляем существующую запись
+                        $existingUser = $existingUsers[$user['email']];
+                        $updateData = [];
+
+                        foreach ($user as $key => $value) {
+                            if ($value !== null && is_null($existingUser->$key)) {
+                                $updateData[$key] = $value;
+                            }
+                        }
+
+                        if (!empty($updateData)) {
+                            UserMT::where('id', $existingUser->id)->update($updateData);
+                            $stats['users_mt']['updated']++;
+                        }
+                    } else {
+                        $newUsers[] = $user;
+                    }
                 }
 
-                foreach ($existingCommon as $email => $common) {
-                    $existingCommonCache[$email] = $common;
-                }
-
-                //фильтруем только новые записи (которых нет в БД)
-                $newUsers = array_filter($usersMtBatch, fn($user) => !isset($existingUsers[$user['email']]));
-
-                //вставляем только новые записи
+                //вставляем новые записи
                 if (!empty($newUsers)) {
                     $this->withTableLock('users_mt', function () use ($newUsers) {
                         UserMT::upsert($newUsers, ['email']);
                     });
-                    $stats['users_mt']['created'] += count($newUsers);  //обновляем статистику
+                    $stats['users_mt']['created'] += count($newUsers);
                 }
 
-                //получаем ID всех пользователей (новых и существующих)
-                $allUsers = UserMT::query()
-                    ->whereIn('email', $emails)
-                    ->pluck('id', 'email')
-                    ->toArray();
+                //обрабатываем common_database
+                $newCommon = [];
+                foreach ($commonDbBatch as $common) {
+                    if (isset($existingCommon[$common['email']])) {
+                        //обновляем существующую запись
+                        $existingCommonRecord = $existingCommon[$common['email']];
+                        $updateData = [];
 
-                //проставляем mt_user_id для связанных записей в common_database
-                foreach ($commonDbBatch as &$record) {
-                    if (isset($allUsers[$record['email']])) {
-                        $record['mt_user_id'] = $allUsers[$record['email']];
+                        foreach ($common as $key => $value) {
+                            if ($value !== null && is_null($existingCommonRecord->$key)) {
+                                $updateData[$key] = $value;
+                            }
+                        }
+
+                        if (!empty($updateData)) {
+                            CommonDatabase::where('id', $existingCommonRecord->id)->update($updateData);
+                            $stats['common_database']['updated']++;
+                        }
+                    } else {
+                        $newCommon[] = $common;
                     }
                 }
-                unset($record);
 
-                $usersMtBatch = [];
-            }
-
-            //обработка пакета для common_database
-            if (!empty($commonDbBatch)) {
-                //фильтруем только новые записи
-                $newCommon = array_filter($commonDbBatch, fn($common) => !isset($existingCommonCache[$common['email']]));
-
-                //вставляем только новые записи
+                //вставляем новые записи
                 if (!empty($newCommon)) {
                     $this->withTableLock('common_database', function () use ($newCommon) {
                         CommonDatabase::upsert($newCommon, ['email']);
@@ -358,15 +289,12 @@ class ImportOldMTUsersFromFile extends Command
                     $stats['common_database']['created'] += count($newCommon);
                 }
 
+                $usersMtBatch = [];
                 $commonDbBatch = [];
             }
         });
 
         //чистим память
-        $usersMtBatch = [];
-        $commonDbBatch = [];
-        $existingUsersCache = [];
-        $existingCommonCache = [];
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 }

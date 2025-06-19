@@ -22,12 +22,12 @@ trait WriteLockTrait
         while (true) {
             try {
                 $locked = DB::transaction(function () use ($tableName) {
-                    // Очищаем старые блокировки (> 5 минут)
+                    //очищаем старые блокировки (> 5 минут)
                     WriteLock::where('table_name', $tableName)
                         ->where('locked_at', '<', Carbon::now()->subMinutes(5))
                         ->delete();
 
-                    // Пытаемся получить или создать блокировку
+                    //пытаемся получить или создать блокировку
                     $lock = WriteLock::firstOrNew(['table_name' => $tableName]);
 
                     if ($lock->exists && $lock->is_writing) {
@@ -45,7 +45,6 @@ trait WriteLockTrait
                 if ($locked) {
                     return;
                 }
-
             } catch (QueryException $e) {
                 $this->handleLockError($e, $tableName, $attempt, $lastErrorTime);
             }

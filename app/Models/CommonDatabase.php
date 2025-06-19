@@ -47,6 +47,17 @@ class CommonDatabase extends Model
 
     protected $guarded = ['id'];
 
+//    protected static function boot()
+//    {
+//        parent::boot();
+//        static::deleting(function ($cd) {
+//            $cd->doctor()->delete();
+//            $cd->parsing_pd()->delete();
+//            $cd->unisender_contact()->delete();
+//            $cd->whatsapp_contact()->delete();
+//        });
+//    }
+
 
     /**
      * Пользователь МТ

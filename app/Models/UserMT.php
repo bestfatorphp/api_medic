@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @package App\Models
  *
  * @property integer        $id
+ * @property integer        $new_mt_id              ID пользователя нового МТ
  * @property string         $full_name              ФИО
  * @property string         $email                  E-mail
  * @property string         $gender                 Пол
@@ -47,8 +48,19 @@ class UserMT extends Model
 
     protected $with = [
 //        'actions_mt',
+//        'actions_new_mt',
 //        'common_database',
     ];
+
+//    protected static function boot()
+//    {
+//        parent::boot();
+//        static::deleting(function ($user) {
+//            $user->actions_mt()->delete();
+//            $user->actions_new_mt()->delete();
+//            $user->common_database()->delete();
+//        });
+//    }
 
     /**
      * Действия МТ

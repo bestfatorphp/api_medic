@@ -44,6 +44,7 @@ class CreateMedicTables extends Migration
         //Пользователи MT
         Schema::create('users_mt', function (Blueprint $table) {
             $table->increments('id');
+            $table->unsignedInteger('new_mt_id')->unique()->nullable()->comment('ID пользователя нового МТ');
             $table->string('full_name')->nullable()->comment('ФИО');
             $table->string('email')->unique()->comment('E-mail');
             $table->string('gender')->nullable()->comment('Пол');
@@ -64,6 +65,7 @@ class CreateMedicTables extends Migration
             $table->string('uf_utm_content')->nullable()->comment('utm метка');
 
             $table->index('email');
+            $table->index('new_mt_id');
         });
 
         //Действия МТ
@@ -75,8 +77,8 @@ class CreateMedicTables extends Migration
             $table->float('duration')->nullable()->comment('Продолжительность');
             $table->float('result')->nullable()->comment('Результат');
 
-            //уникальный индекс для предотвращения дублирования при пакетной записи
-            $table->unique(['mt_user_id', 'activity_id', 'date_time'], 'unique_action');
+            //уникальный индекс для предотвращения дублирования при пакетной вставке
+            $table->unique(['mt_user_id', 'activity_id', 'date_time'], 'actions_mt_unique_action');
         });
 
         //Unisender контакты
@@ -163,6 +165,7 @@ class CreateMedicTables extends Migration
             $table->string('email_status')->nullable()->comment('Статус e-mail');
 
             $table->index('email');
+            $table->index('mt_user_id');
         });
 
         //Парсинг PD
@@ -179,7 +182,7 @@ class CreateMedicTables extends Migration
     {
         if (Schema::hasTable('actions_mt')) {
             Schema::table('actions_mt', function (Blueprint $table) {
-                $table->dropUnique('unique_action');
+                $table->dropUnique('actions_mt_unique_action');
             });
         }
 

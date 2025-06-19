@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
+use App\Models\CommonDatabase;
 use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
@@ -350,6 +351,12 @@ class ImportMTHeliosFile extends Command
                                 ['email' => $email]
                             );
                         });
+                        $this->withTableLock('common_database', function () use ($email, $currentUser) {
+                            CommonDatabase::updateOrCreate(
+                                ['email' => $email],
+                                ['email' => $email, 'mt_user_id' => $currentUser->id]
+                            );
+                        });
                     } else {
                         Log::warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
@@ -384,11 +391,12 @@ class ImportMTHeliosFile extends Command
                 ];
 
                 /** @var ActivityMT $activity */
-                $activity = ActivityMT::firstOrCreate([
-                    'type' => $activityData['type'],
-                    'name' => $activityData['name'],
-                    'date_time' => $dateTime,
-                ], $activityData);
+                $activity = $this->withTableLock('activities_mt', function () use ($activityData) {
+                    return ActivityMT::firstOrCreate(
+                        $activityData,
+                        $activityData
+                    );
+                });
 
                 //парсим duration (продолжительность)
                 $durationInSeconds = floatval(str_replace(',', '.', str_replace('не передаются данные по продолжительности', '0', $row[3] ?? '')));
@@ -411,7 +419,7 @@ class ImportMTHeliosFile extends Command
                 if (count($actionsToInsert) >= $batchSize) {
                     ++$countBatchInsert;
                     $this->info("Пакетная вставка - $countBatchInsert");
-                    ActionMT::insertOrIgnore($actionsToInsert);
+                    $this->insertActions($actionsToInsert);
                     $actionsToInsert = [];
                     gc_mem_caches(); //очищаем кэши памяти Zend Engine
 
@@ -422,13 +430,23 @@ class ImportMTHeliosFile extends Command
             if (!empty($actionsToInsert)) {
                 ++$countBatchInsert;
                 $this->info("Пакетная вставка - $countBatchInsert");
-                ActionMT::insertOrIgnore($actionsToInsert);
+                $this->insertActions($actionsToInsert);
             }
         } finally {
             fclose($handle);
         }
 
         $this->info("Обработка CSV завершена.");
+    }
+
+    /**
+     * @param array $actionsToInsert
+     */
+    private function insertActions(array $actionsToInsert)
+    {
+        $this->withTableLock('actions_mt', function () use ($actionsToInsert) {
+            ActionMT::insertOrIgnore($actionsToInsert);
+        });
     }
 
     /**
