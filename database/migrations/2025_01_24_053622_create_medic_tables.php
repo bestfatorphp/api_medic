@@ -65,6 +65,7 @@ class CreateMedicTables extends Migration
             $table->string('uf_utm_content')->nullable()->comment('utm метка');
 
             $table->index('email');
+            $table->index('phone');
             $table->index('new_mt_id');
         });
 
@@ -77,6 +78,7 @@ class CreateMedicTables extends Migration
             $table->float('duration')->nullable()->comment('Продолжительность');
             $table->float('result')->nullable()->comment('Результат');
 
+            $table->index('mt_user_id');
             //уникальный индекс для предотвращения дублирования при пакетной вставке
             $table->unique(['mt_user_id', 'activity_id', 'date_time'], 'actions_mt_unique_action');
         });
@@ -88,6 +90,8 @@ class CreateMedicTables extends Migration
             $table->string('contact_status')->nullable()->comment('Статус контакта');
             $table->string('email_status')->nullable()->comment('Статус E-mail');
             $table->boolean('email_availability')->nullable()->comment('Доступность E-mail');
+
+            $table->index('email');
         });
 
         //Unisender рассылки
@@ -115,12 +119,19 @@ class CreateMedicTables extends Migration
             $table->string('email')->comment('E-mail');
             $table->string('result')->nullable()->comment('Результат отправки');
             $table->dateTime('update_time')->nullable()->comment('Время обновления');
+
+            $table->index('campaign_id');
+            $table->index('email');
+            //уникальный индекс для предотвращения дублирования при пакетной вставке
+            $table->unique(['campaign_id', 'email', 'update_time'], 'unisender_participation_unique_action');
         });
 
         //Whatsapp контакты
         Schema::create('whatsapp_contacts', function (Blueprint $table) {
             $table->increments('id');
             $table->string('phone')->unique()->comment('Телефон');
+
+            $table->index('phone');
         });
 
         //Whatsapp рассылки (чаты)
@@ -136,6 +147,50 @@ class CreateMedicTables extends Migration
             $table->integer('campaign_id')->comment('ID чата рассылки');
             $table->string('phone')->comment('Телефон');
             $table->dateTime('send_date')->nullable()->comment('Дата отправки сообщения');
+
+            $table->index('campaign_id');
+            $table->index('phone');
+        });
+
+        //SendSay контакты
+        Schema::create('sendsay_contacts', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('email')->unique()->comment('E-mail');
+            $table->string('email_status')->nullable()->comment('Статус E-mail');
+            $table->boolean('email_availability')->nullable()->comment('Доступность E-mail');
+
+            $table->index('email');
+        });
+
+        //SendSay рассылки
+        Schema::create('sendsay_issue', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('issue_name')->nullable()->comment('Наименоание рассылки');
+            $table->dateTime('send_date')->nullable()->comment('Дата отправки');
+            $table->float('open_rate')->nullable()->comment('Открытия, значение в процентах');
+            $table->float('ctr')->nullable()->comment('Число переходов по ссылкам писем/число доставленных в процентах');
+            $table->integer('sent')->nullable()->comment('Количество отправленных');
+            $table->integer('delivered')->nullable()->comment('Количество доставленных');
+            $table->float('delivery_rate')->nullable()->comment('Доставка, значение в процентах');
+            $table->integer('opened')->nullable()->comment('Количество открытий');
+            $table->integer('open_per_unique')->nullable()->comment('Количество уникальных открытий');
+            $table->integer('clicked')->nullable()->comment('Количество кликов');
+            $table->integer('clicks_per_unique')->nullable()->comment('Количество уникальных кликов');
+            $table->float('ctor')->nullable()->comment('Число переходов по ссылкам из писем/число открытых в процентах');
+        });
+
+        //SendSay участия
+        Schema::create('sendsay_participation', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('issue_id')->comment('ID sendsay рассылки');
+            $table->string('email')->comment('E-mail');
+            $table->string('result')->nullable()->comment('Результат отправки');
+            $table->dateTime('update_time')->nullable()->comment('Время обновления');
+
+            $table->index('issue_id');
+            $table->index('email');
+            //уникальный индекс для предотвращения дублирования при пакетной вставке
+            $table->unique(['issue_id', 'email', 'update_time'], 'sendsay_participation_unique_action');
         });
 
         //Общая база
@@ -175,6 +230,8 @@ class CreateMedicTables extends Migration
             $table->string('difference')->nullable()->comment('Различие');
             $table->string('pd_workplace')->nullable()->comment('Место работы PD');
             $table->string('pd_address_workplace')->nullable()->comment('Адрес места работы PD');
+
+            $table->index('mt_user_id');
         });
     }
 
@@ -194,6 +251,9 @@ class CreateMedicTables extends Migration
         Schema::dropIfExists('whatsapp_participation');
         Schema::dropIfExists('whatsapp_campaign');
         Schema::dropIfExists('whatsapp_contacts');
+        Schema::dropIfExists('sendsay_participation');
+        Schema::dropIfExists('sendsay_issue');
+        Schema::dropIfExists('sendsay_contacts');
         Schema::dropIfExists('actions_mt');
         Schema::dropIfExists('users_mt');
         Schema::dropIfExists('activities_mt');

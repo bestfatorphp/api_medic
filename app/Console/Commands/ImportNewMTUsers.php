@@ -12,7 +12,6 @@ use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;

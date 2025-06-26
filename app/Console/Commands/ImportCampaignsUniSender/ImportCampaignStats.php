@@ -7,7 +7,7 @@ use App\Logging\CustomLog;
 use Carbon\Carbon;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class ImportCampaignStatsCommand extends Common
+class ImportCampaignStats extends Common
 {
     /**
      * @var string

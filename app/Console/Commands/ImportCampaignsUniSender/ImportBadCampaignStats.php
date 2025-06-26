@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\NoReturn;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class ImportBadCampaignStatsCommand extends Common
+class ImportBadCampaignStats extends Common
 {
     /**
      * @var string

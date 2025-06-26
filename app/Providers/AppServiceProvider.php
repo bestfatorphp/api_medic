@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\IqSmsService;
+use App\Services\SendSayService;
 use Illuminate\Support\ServiceProvider;
 use App\Services\IntellectDialogService;
 use App\Services\UniSenderService;
@@ -16,6 +17,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        $this->app->singleton('send-say', function () {
+            return new SendSayService();
+        });
+
         $this->app->singleton('uni-sender', function () {
             return new UniSenderService();
         });

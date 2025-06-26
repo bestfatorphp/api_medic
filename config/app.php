@@ -234,6 +234,7 @@ return [
         'UniSender' => App\Facades\UniSender::class,
         'IntellectDialog' => App\Facades\IntellectDialog::class,
         'IqSms' => App\Facades\IqSmsFacade::class,
+        'SendSay' => App\Facades\SendSay::class,
     ],
 
 ];

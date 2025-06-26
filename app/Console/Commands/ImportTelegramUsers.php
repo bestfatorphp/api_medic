@@ -48,7 +48,7 @@ class ImportTelegramUsers extends Command
 
             //основной процесс обработки данных
             $this->processStream();
-            $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
+            $this->info("\n[" . Carbon::now()->format('Y-m-d H:i:s') . "] Импорт завершен");
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
             CustomLog::errorLog(__CLASS__, 'commands', $e);

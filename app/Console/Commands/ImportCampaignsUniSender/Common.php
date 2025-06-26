@@ -87,21 +87,23 @@ class Common extends Command
 
                 $campaignCommonStats = $campaignCommonStats['result'];
 
-                $campaignDB = UnisenderCampaign::create([
-                    'id' => $campaignId,
-                    'campaign_name' => $campaign['subject'] ?? 'Без названия',
-                    'send_date' => Carbon::parse($campaign['start_time'])->format('Y-m-d H:i:s'),
-                    'open_rate' => $this->calculateRate($campaignCommonStats['delivered'], $campaignCommonStats['read_all']),
-                    'ctr' => $this->calculateRate($campaignCommonStats['clicked_all'], $campaignCommonStats['delivered']), //число переходов по ссылкам писем/число доставленных
-                    'sent' => $campaignCommonStats['sent'],
-                    'delivered' => $campaignCommonStats['delivered'],
-                    'delivery_rate' => $this->calculateRate($campaignCommonStats['total'], $campaignCommonStats['delivered']),
-                    'opened' => $campaignCommonStats['read_all'],
-                    'open_per_unique' => $campaignCommonStats['read_unique'],
-                    'clicked' => $campaignCommonStats['clicked_all'],
-                    'clicks_per_unique' => $campaignCommonStats['clicked_unique'],
-                    'ctor' => $this->calculateRate($campaignCommonStats['clicked_all'], $campaignCommonStats['read_all']), //число переходов по ссылкам из писем/число открытых
-                ]);
+                $campaignDB = $this->withTableLock('unisender_campaign', function () use ($campaignId, $campaign, $campaignCommonStats) {
+                    return UnisenderCampaign::create([
+                        'id' => $campaignId,
+                        'campaign_name' => $campaign['subject'] ?? 'Без названия',
+                        'send_date' => Carbon::parse($campaign['start_time'])->format('Y-m-d H:i:s'),
+                        'open_rate' => $this->calculateRate($campaignCommonStats['delivered'], $campaignCommonStats['read_all']),
+                        'ctr' => $this->calculateRate($campaignCommonStats['clicked_all'], $campaignCommonStats['delivered']), //число переходов по ссылкам писем/число доставленных
+                        'sent' => $campaignCommonStats['sent'],
+                        'delivered' => $campaignCommonStats['delivered'],
+                        'delivery_rate' => $this->calculateRate($campaignCommonStats['total'], $campaignCommonStats['delivered']),
+                        'opened' => $campaignCommonStats['read_all'],
+                        'open_per_unique' => $campaignCommonStats['read_unique'],
+                        'clicked' => $campaignCommonStats['clicked_all'],
+                        'clicks_per_unique' => $campaignCommonStats['clicked_unique'],
+                        'ctor' => $this->calculateRate($campaignCommonStats['clicked_all'], $campaignCommonStats['read_all']), //число переходов по ссылкам из писем/число открытых
+                    ]);
+                });
             }
         }
 
@@ -213,8 +215,7 @@ class Common extends Command
 
             //если набралась партия, сохраняем данные
             if (count($batchParticipations) >= self::BATCH_SIZE) {
-                UnisenderParticipation::insertOrIgnore($batchParticipations);
-                $batchParticipations = [];
+                $this->insertParticipation($batchParticipations);
             }
 
             //добавляем email в массив для дальнейшей обработки
@@ -228,12 +229,23 @@ class Common extends Command
 
         //сохраняем оставшиеся данные
         if (!empty($batchParticipations)) {
-            UnisenderParticipation::insertOrIgnore($batchParticipations);
+            $this->insertParticipation($batchParticipations);
         }
         $this->info("Записи добавлены в таблицу unisender_participation.");
 
         //обрабатываем контакты
         $this->fetchContactsInBatches($emails);
+    }
+
+    /**
+     * @param array $batchParticipations
+     */
+    private function insertParticipation(array &$batchParticipations)
+    {
+        $this->withTableLock('unisender_participation', function () use ($batchParticipations) {
+            UnisenderParticipation::insertOrIgnore($batchParticipations);
+        });
+        $batchParticipations = [];
     }
 
     /**
@@ -291,7 +303,9 @@ class Common extends Command
 
             //массовая вставка только новых (если нужно можно добавить поля для обновления в существующих)
             if (!empty($batchContacts)) {
-                UnisenderContact::upsert($batchContacts, ['email']);
+                $this->withTableLock('unisender_contacts', function () use ($batchContacts) {
+                    UnisenderContact::upsert($batchContacts, ['email']);
+                });
                 $batchContacts = [];
             }
             if (!empty($batchCommonDB)) {

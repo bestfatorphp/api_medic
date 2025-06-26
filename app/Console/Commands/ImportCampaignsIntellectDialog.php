@@ -166,10 +166,12 @@ class ImportCampaignsIntellectDialog extends Command
                 ->first();
 
             if (empty($campaign)) {
-                $campaign = WhatsAppCampaign::create([
-                    'campaign_name' => $text,
-                    'send_date' => Carbon::parse($message['created_at']),
-                ]);
+                $campaign = $this->withTableLock('whatsapp_campaign', function () use ($message) {
+                    return WhatsAppCampaign::create([
+                        'campaign_name' => $message['text'],
+                        'send_date' => Carbon::parse($message['created_at']),
+                    ]);
+                });
             }
 
             $campaignsBatch[] = [
@@ -239,14 +241,18 @@ class ImportCampaignsIntellectDialog extends Command
         DB::beginTransaction();
         try {
             if (!empty($contactsBatch)) {
-                WhatsAppContact::upsert(
-                    $contactsBatch,
-                    ['phone'] //phone является уникальным ключом
-                );
+                $this->withTableLock('whatsapp_contacts', function () use ($contactsBatch) {
+                    WhatsAppContact::upsert(
+                        $contactsBatch,
+                        ['phone'] //phone является уникальным ключом
+                    );
+                });
             }
 
             if (!empty($participationBatch)) {
-                WhatsAppParticipation::insertOrIgnore($participationBatch);
+                $this->withTableLock('whatsapp_participation', function () use ($participationBatch) {
+                    WhatsAppParticipation::insertOrIgnore($participationBatch);
+                });
             }
 
             DB::commit();
