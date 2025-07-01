@@ -41,8 +41,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('13:35')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
-        $schedule->command('import:us-campaigns --from=15.05.2025 --to=01.06.2025')
+        $schedule->command('import:new-mt-touches') //нет updated_after!!!
             ->dailyAt('13:36')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
+
+        $schedule->command('import:us-campaigns --from=15.05.2025 --to=01.06.2025')
+            ->dailyAt('13:37')
             ->sendOutputTo(storage_path("{$commonPath}import-us-campaigns.log"));
     }
 

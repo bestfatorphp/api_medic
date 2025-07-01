@@ -32,15 +32,6 @@ class CreateMedicTables extends Migration
             $table->string('name')->comment('Название Фарма');
         });
 
-        //Активности МТ
-        Schema::create('activities_mt', function (Blueprint $table) {
-            $table->increments('id');
-            $table->string('type')->nullable()->comment('Тип активности');
-            $table->string('name')->nullable()->comment('Название активности');
-            $table->dateTime('date_time')->nullable()->comment('Дата и время');
-            $table->boolean('is_online')->default(false)->comment('Очное');
-        });
-
         //Пользователи MT
         Schema::create('users_mt', function (Blueprint $table) {
             $table->increments('id');
@@ -69,6 +60,15 @@ class CreateMedicTables extends Migration
             $table->index('new_mt_id');
         });
 
+        //Активности МТ
+        Schema::create('activities_mt', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('type')->nullable()->comment('Тип активности');
+            $table->string('name')->nullable()->comment('Название активности');
+            $table->dateTime('date_time')->nullable()->comment('Дата и время');
+            $table->boolean('is_online')->default(false)->comment('Очное');
+        });
+
         //Действия МТ
         Schema::create('actions_mt', function (Blueprint $table) {
             $table->increments('id');
@@ -81,6 +81,31 @@ class CreateMedicTables extends Migration
             $table->index('mt_user_id');
             //уникальный индекс для предотвращения дублирования при пакетной вставке
             $table->unique(['mt_user_id', 'activity_id', 'date_time'], 'actions_mt_unique_action');
+        });
+
+        //Проекты нового МТ
+        Schema::create('projects_mt', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('project')->comment('Наименование проекта');
+            $table->string('wave')->nullable()->comment('Волна');
+            $table->dateTime('date_time')->nullable()->comment('Дата и время');
+
+            $table->unique(['project', 'wave', 'date_time'], 'projects_mt_unique_project');
+        });
+
+        //Касания проектов нового МТ
+        Schema::create('project_touches_mt', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('mt_user_id')->comment('ID пользователя МТ');
+            $table->unsignedInteger('project_id')->comment('ID проекта МТ (волны)');
+            $table->string('touch_type')->comment('Тип касания');
+            $table->boolean('status')->comment('Статус касания');
+            $table->dateTime('date_time')->nullable()->comment('Дата и время');
+
+            $table->index('mt_user_id');
+            $table->index('project_id');
+            //уникальный индекс для предотвращения дублирования при пакетной вставке
+            $table->unique(['mt_user_id', 'project_id', 'touch_type', 'date_time'], 'project_touches_mt_unique_touch');
         });
 
         //Unisender контакты
@@ -220,6 +245,7 @@ class CreateMedicTables extends Migration
             $table->string('email_status')->nullable()->comment('Статус e-mail');
 
             $table->index('email');
+            $table->index('phone');
             $table->index('mt_user_id');
         });
 
@@ -254,9 +280,13 @@ class CreateMedicTables extends Migration
         Schema::dropIfExists('sendsay_participation');
         Schema::dropIfExists('sendsay_issue');
         Schema::dropIfExists('sendsay_contacts');
+
+        Schema::dropIfExists('projects_mt');
+        Schema::dropIfExists('project_touches_mt');
         Schema::dropIfExists('actions_mt');
-        Schema::dropIfExists('users_mt');
         Schema::dropIfExists('activities_mt');
+        Schema::dropIfExists('users_mt');
+
         Schema::dropIfExists('pharma');
         Schema::dropIfExists('doctors');
     }

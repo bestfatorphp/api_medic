@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\ImportNewMt;
 
 use App\Helpers\DBHelper;
 use App\Logging\CustomLog;
@@ -8,10 +8,7 @@ use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
 use App\Models\UserMT;
-use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;
@@ -21,38 +18,34 @@ use Illuminate\Support\Facades\DB;
  * Пока у нас не будет на стороне нового МТ, при изменениях любой связи, изменяться updated_at у пользователя, придётся прокручивать всех пользователей!
  * Команда очень долгая.
  */
-class ImportNewMTUsers extends Command
+class ImportByApiV1 extends Common
 {
-    use WriteLockTrait;
 
     protected $signature = 'import:new-mt-users
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=100 : Колличество записей за один запрос}';
+                            {--pageSize=500 : Колличество записей за один запрос}';
 
     protected $description = 'Импорт пользователей нового сайта МедТач, в ограниченной памяти';
 
-
     /**
-     * Колличество записей за один запрос
+     * Версия апи
      * @var int
      */
-    private int $pageSize;
+    protected int $apiVersion = 1;
 
     /**
-     * Размер пакета
-     * @var int
+     * @throws \Exception
      */
-    private int $chunkSize = 500;
+    public function __construct()
+    {
+        parent::__construct();
+    }
 
     /**
      * @return int
      */
     public function handle(): int
     {
-        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установливаем ограничение по памяти
-        set_time_limit(0); //без ограничения времени выполнения
-        DB::disableQueryLog(); //отключаем логирование запросов
-
         $updatedAfter = $this->option('updated_after');
         $this->pageSize = $this->option('pageSize');
         $queryParams = [
@@ -100,6 +93,7 @@ class ImportNewMTUsers extends Command
             while ($hasMorePages) {
                 ++$totalResponses;
                 $this->info("Запрос данных - $totalResponses");
+
                 $response = $this->getData('outer/user', $queryParams, $page);
 
                 if (empty($data = $response['data'])) {
@@ -126,7 +120,7 @@ class ImportNewMTUsers extends Command
                     $totalProcessed++;
                 }
 
-                if (count($usersMTBatch) >= $this->chunkSize) {
+                if (count($usersMTBatch) >= static::BATCH_SIZE) {
                     ++$countBatchInsert;
                     $this->info("Пакетная вставка - $countBatchInsert (всего записей $totalProcessed)");
                     $this->insertUsersBatch($usersMTBatch, $commonDBBatch);
@@ -386,7 +380,7 @@ class ImportNewMTUsers extends Command
                     $totalProcessed++;
                 }
 
-                if ($totalProcessed % $this->chunkSize === 0) {
+                if ($totalProcessed % static::BATCH_SIZE === 0) {
                     ++$countBatchInsert;
                     $this->info("Пакетная вставка - $countBatchInsert");
                     $this->insertActions($actionsToInsert);
@@ -488,7 +482,7 @@ class ImportNewMTUsers extends Command
                     $totalProcessed++;
                 }
 
-                if ($totalProcessed % $this->chunkSize === 0) {
+                if ($totalProcessed % static::BATCH_SIZE === 0) {
                     ++$countBatchInsert;
                     $this->info("Пакетная вставка - $countBatchInsert");
                     $this->insertActions($actionsToInsert);
@@ -517,37 +511,5 @@ class ImportNewMTUsers extends Command
         }
 
         $this->info("Извлечено $totalProcessed квизов");
-    }
-
-    /**
-     * Делаем запрос на сторонний сервис
-     * @param string $endpoint  Эндпоинт
-     * @param array $body       Body гет-запроса
-     * @param int $page         Номер страницы пагинации
-     * @return mixed
-     * @throws \Exception
-     */
-    private function getData(string $endpoint, array $body, int $page): mixed
-    {
-        try {
-            $url = env('NEW_MT_URL_1') . $endpoint;
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('NEW_MT_OUTER_TOKEN'),
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->send('GET', $url . "?page=$page", [
-                'body' => json_encode($body), //повторяем запрос Postman
-            ]);
-
-            if (!$response->successful()) {
-                throw new \Exception("API request, по [$url], завершился с ошибкой. Status: {$response->status()}. Response: " . $response->body());
-            }
-
-            return $response->json();
-        } catch (\Exception $e) {
-            $this->error("Ошибка в getData: " . $e->getMessage());
-            throw $e;
-        }
     }
 }
