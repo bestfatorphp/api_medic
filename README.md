@@ -32,7 +32,7 @@ cd yourproject
 
 ```bash
 # Перейти в контейнер сервиса:
-docker-compose exec app bash
+docker compose exec app bash
 
 # Копирование .env файла (после заполнить переменные окружения)
 cp .env.example .env
