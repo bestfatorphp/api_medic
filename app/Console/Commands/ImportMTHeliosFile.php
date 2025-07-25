@@ -146,20 +146,26 @@ class ImportMTHeliosFile extends Command
     {
         $this->info("Инициализация headless браузера...");
 
-        $userAgents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        $options = [
+            '--headless=new',
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--window-size=1200,800',
+            '--disable-gpu',
         ];
 
-        return Client::createChromeClient(null, [
-                '--headless=new',
-                '--window-size=1200,800',
-                '--disable-gpu',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
+        if (env('APP_ENV') !== 'production') {
+            $userAgents = [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ];
+
+            $options = array_merge($options, [
                 '--user-agent='.$userAgents[array_rand($userAgents)]
-            ]
-        );
+            ]);
+        }
+
+        return Client::createChromeClient(null, $options);
     }
 
     /**
