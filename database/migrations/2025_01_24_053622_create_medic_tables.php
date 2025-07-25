@@ -263,12 +263,6 @@ class CreateMedicTables extends Migration
 
     public function down()
     {
-        if (Schema::hasTable('actions_mt')) {
-            Schema::table('actions_mt', function (Blueprint $table) {
-                $table->dropUnique('actions_mt_unique_action');
-            });
-        }
-
         Schema::dropIfExists('parsing_pd');
         Schema::dropIfExists('common_database');
         Schema::dropIfExists('unisender_participation');

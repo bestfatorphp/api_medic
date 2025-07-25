@@ -103,11 +103,11 @@ class ImportMTHeliosFile extends Command
      */
     public function handle(): int
     {
+        $client = $this->initBrowser();
         try {
             $this->logMemory('Начало выполнения');
             $fileUrl = $this->getTargetUrl();
             $this->info("Используется URL: " . $fileUrl);
-            $client = $this->initBrowser();
             $downloadUrl = $this->extractDownloadUrl($client, $fileUrl);
             $this->info("URL для скачивания: " . $downloadUrl);
 
@@ -133,6 +133,7 @@ class ImportMTHeliosFile extends Command
             if (isset($this->tmpFilePath) && file_exists($this->tmpFilePath)) {
                 unlink($this->tmpFilePath);
             }
+            $client->quit();
         }
     }
 
