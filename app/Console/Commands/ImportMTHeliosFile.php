@@ -146,6 +146,8 @@ class ImportMTHeliosFile extends Command
     {
         $this->info("Инициализация headless браузера...");
 
+        $isLocal = env('APP_ENV') !== 'production';
+
         $options = [
             '--headless=new',
             '--no-sandbox',
@@ -154,7 +156,17 @@ class ImportMTHeliosFile extends Command
             '--disable-gpu',
         ];
 
-        if (env('APP_ENV') !== 'production') {
+        if (!$isLocal) {
+            $profileDir = '/tmp/chrome-profile-'.md5(microtime());
+            if (!file_exists($profileDir)) {
+                mkdir($profileDir, 0755, true);
+            }
+
+            $options = array_merge($options, [
+                '--user-data-dir='.$profileDir,
+                '--remote-debugging-port=9222'
+            ]);
+        } else {
             $userAgents = [
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
