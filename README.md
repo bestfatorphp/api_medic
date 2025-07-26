@@ -19,7 +19,36 @@ git clone git@github.com:yourusername/yourproject.git
 cd yourproject
 ```
 
-## 2. Настройка Docker окружения согласно переданным файлам (описывать не буду)
+## 2. Установки для Panther
+```bash
+# Установка Chromium 111.x без Snap
+sudo add-apt-repository ppa:saiarcot895/chromium-dev
+sudo apt update
+sudo apt install -y chromium-browser
+
+# Устанавливаем ChromeDriver в системные пути
+# Создаем временную папку
+mkdir ~/temp_chromedriver && cd ~/temp_chromedriver
+
+# Скачиваем совместимую версию (для Chromium 111.x)
+wget https://chromedriver.storage.googleapis.com/111.0.5563.64/chromedriver_linux64.zip
+unzip chromedriver_linux64.zip
+sudo mv chromedriver /usr/bin/
+chmod +x /usr/bin/chromedriver
+
+# Очищаем временные файлы
+cd ~ && rm -rf ~/temp_chromedriver
+
+# Проаеряем версии (должны иметь одну мажорную версию)
+/usr/bin/chromium-browser --version
+/usr/bin/chromedriver --version
+
+
+# Прописать в .env
+PANTHER_CHROME_BINARY=/usr/bin/chromium-browser
+PANTHER_CHROME_DRIVER_BINARY=/usr/bin/chromedriver
+
+```
 
 ## 3. Устновить cron или суперкроник (на выбор, для докера лучше суперкроник с супервизором)... 
 ```bash
