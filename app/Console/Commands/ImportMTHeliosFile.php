@@ -176,8 +176,14 @@ class ImportMTHeliosFile extends Command
                 '--user-agent='.$userAgents[array_rand($userAgents)]
             ]);
         }
-
-        return Client::createChromeClient(null, $options);
+        try {
+            return Client::createChromeClient(null, $options);
+        }  finally {
+            if (!$isLocal) {
+                array_map('unlink', glob("$profileDir/*"));
+                @rmdir($profileDir);
+            }
+        }
     }
 
     /**
