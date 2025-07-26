@@ -164,7 +164,8 @@ class ImportMTHeliosFile extends Command
 
             $options = array_merge($options, [
                 '--user-data-dir='.$profileDir,
-                '--remote-debugging-port=9222'
+                '--remote-debugging-port=9222',
+                '--disable-build-check'
             ]);
         } else {
             $userAgents = [
