@@ -419,7 +419,10 @@ class ImportMTHeliosFile extends Command
                 /** @var ActivityMT $activity */
                 $activity = $this->withTableLock('activities_mt', function () use ($activityData) {
                     return ActivityMT::firstOrCreate(
-                        $activityData,
+                        [
+                            'type' => $activityData['type'],
+                            'name' => $activityData['name']
+                        ],
                         $activityData
                     );
                 });

@@ -90,7 +90,7 @@ class CreateMedicTables extends Migration
             $table->string('wave')->nullable()->comment('Волна');
             $table->dateTime('date_time')->nullable()->comment('Дата и время');
 
-            $table->unique(['project', 'wave', 'date_time'], 'projects_mt_unique_project');
+            $table->unique(['project', 'wave'], 'projects_mt_unique_project');
         });
 
         //Касания проектов нового МТ
