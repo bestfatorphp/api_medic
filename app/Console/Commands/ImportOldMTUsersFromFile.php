@@ -20,7 +20,7 @@ class ImportOldMTUsersFromFile extends Command
     use WriteLockTrait;
 
     protected $signature = 'import:old-mt-users
-                          {--chunk=1000 : Количество записей за одну транзакцию}';
+                          {--chunk=500 : Количество записей за одну транзакцию}';
 
     protected $description = 'Импорт пользователей старого сайта МедТач, с обработкой 1M+ записей в ограниченной памяти';
 

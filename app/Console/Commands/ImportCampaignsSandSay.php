@@ -41,7 +41,7 @@ class ImportCampaignsSandSay extends Command
      * Размер пакета для вставки
      * @var int
      */
-    private $batchSize = 1000;
+    private $batchSize = 500;
 
     /**
      * Поля статистики, получаемые из API SendSay
