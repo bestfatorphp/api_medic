@@ -23,7 +23,7 @@ class ImportByApiV1 extends Common
 
     protected $signature = 'import:new-mt-users
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=500 : Колличество записей за один запрос}';
+                            {--pageSize=100 : Колличество записей за один запрос}';
 
     protected $description = 'Импорт пользователей нового сайта МедТач, в ограниченной памяти';
 
