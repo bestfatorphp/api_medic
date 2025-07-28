@@ -44,7 +44,7 @@ class Common extends Command
     /**
      * Размер партии для пакетной вставки данных в базу.
      */
-    protected const BATCH_SIZE = 1000;
+    protected const BATCH_SIZE = 500;
 
     /**
      * @throws \Exception
