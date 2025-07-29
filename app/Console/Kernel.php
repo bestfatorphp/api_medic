@@ -19,7 +19,7 @@ class Kernel extends ConsoleKernel
         $commonPath = 'logs/';
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
-        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+        /*$schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
             ->dailyAt('00:10')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
@@ -33,20 +33,20 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('import:id-campaigns')
             ->dailyAt('00:40')
-            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
+            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));*/
 
         //Перенесли из файла, лучше запускать руками, если файл будет изменён!!!
 //        $schedule->command('import:old-mt-users')
 //            ->dailyAt('00:50')
 //            ->sendOutputTo(storage_path("{$commonPath}import-old-mt-users.log"));
 
-        $schedule->command('import:new-mt-users')
+        /*$schedule->command('import:new-mt-users')
             ->dailyAt('01:00')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
         $schedule->command('import:new-mt-touches')
             ->dailyAt('01:10')
-            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));*/
 
 //        $schedule->command('import:us-campaigns')
 //            ->dailyAt('01:20')
