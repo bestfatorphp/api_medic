@@ -133,10 +133,6 @@ class ImportCampaignsSandSay extends Command
         $skip = 0;
         $hasMore = true;
 
-
-        $testDataClick = [];
-        $testDataRead = [];
-
         while ($hasMore) {
             $stats = $this->getIssueStats($issueId, $limit, $skip);
 
@@ -284,13 +280,6 @@ class ImportCampaignsSandSay extends Command
         if (count($batchParticipations) > 0) {
             $this->saveBatchDataParticipations($batchParticipations);
         }
-
-        Log::info("IssueId: $issueId");
-        Log::info('Clicks: ', $testDataClick);
-//        Log::info('Read: ', $testDataRead);
-
-        $testDataClick = [];
-        $testDataRead = [];
     }
 
     /**
