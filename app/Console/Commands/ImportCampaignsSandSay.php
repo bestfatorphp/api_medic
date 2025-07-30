@@ -272,13 +272,13 @@ class ImportCampaignsSandSay extends Command
             $hasMore = count($stats) === $limit;
         }
 
+        if (count($batchParticipations) > 0) {
+            $this->saveBatchDataParticipations($batchParticipations);
+        }
+
         //сохраняем оставшиеся данные
         if ($batchCount > 0) {
             $this->saveBatchData($batchContacts, $batchCommonDB);
-        }
-
-        if (count($batchParticipations) > 0) {
-            $this->saveBatchDataParticipations($batchParticipations);
         }
     }
 
