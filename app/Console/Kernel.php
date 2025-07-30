@@ -18,6 +18,11 @@ class Kernel extends ConsoleKernel
     {
         $commonPath = 'logs/';
 
+        $schedule->command('import:sendsay-stats --from=01.05.2025 --to=29.07.2025')
+            ->yearlyOn(now()->month, now()->day, '09:30')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay-cn.log"));
+
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
         /*$schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
             ->dailyAt('00:10')
