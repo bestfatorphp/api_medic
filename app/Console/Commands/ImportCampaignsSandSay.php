@@ -30,8 +30,7 @@ class ImportCampaignsSandSay extends Command
      * @var string
      */
     protected $signature = 'import:sendsay-stats
-                            {--from= : Начальная дата в формате DD.MM.YYYY}
-                            {--to= : Конечная дата в формате DD.MM.YYYY}
+                            {--from= : Начальная дата сбора clicks и read в формате DD.MM.YYYY}
                             {--limit=500 : Колличество записей за один запрос}
                             {--sleep=1 : Задержка между запросами}';
 
@@ -44,7 +43,7 @@ class ImportCampaignsSandSay extends Command
      * Размер пакета для вставки
      * @var int
      */
-    private $batchSize = 500;
+    private int $batchSize = 500;
 
     /**
      * @var string
@@ -115,13 +114,11 @@ class ImportCampaignsSandSay extends Command
                 }
             }
 
+            $this->newLine();
+            $this->info('Собираю clicks и read');
+
             //собираем участия отдельно за дату от и до
-            try {
-                $this->processParticipations($limit);
-            } catch (\Exception $e) {
-                Log::channel('commands')->error("Ошибка обработки участий: " . $e->getMessage());
-                $this->warn(" [!] Ошибка обработки участий: " . $e->getMessage());
-            }
+            $this->processParticipations($limit);
 
             $progressBar->finish();
             $this->newLine();
@@ -144,7 +141,6 @@ class ImportCampaignsSandSay extends Command
     private function processIssue(array $issue, int $limit): void
     {
         $issueId = $issue['id'];
-        $isIssueCreated = false;
         $batchCommonDB = [];
         $batchContacts = [];
         $processedEmails = [];
@@ -160,11 +156,9 @@ class ImportCampaignsSandSay extends Command
                 continue;
             }
 
-            //создаем запись о рассылке при первом получении данных
-            if (!$isIssueCreated) {
-                $this->createOrUpdateIssue($stats[0]);
-                $isIssueCreated = true;
-            }
+            //создаем/обновляем запись о рассылке
+            $this->createOrUpdateIssue($stats[0]);
+
 
             foreach ($stats as $stat) {
                 $email = $stat['member.email'];
@@ -210,16 +204,7 @@ class ImportCampaignsSandSay extends Command
         $batchParticipations = [];
         foreach ($statuses as $status) {
             //получаем статистику по кликам и чтению письма
-            $this->getParticipations($status, $limit, $batchParticipations);
-
-            //сохраняем при достижении размера пакета
-            if (count($batchParticipations) >= $this->batchSize) {
-                $this->saveBatchDataParticipations($batchParticipations);
-            }
-        }
-
-        if (count($batchParticipations) > 0) {
-            $this->saveBatchDataParticipations($batchParticipations);
+            $this->getParticipationsAndSave($status, $limit, $batchParticipations);
         }
     }
 
@@ -229,11 +214,13 @@ class ImportCampaignsSandSay extends Command
      * @param int $limit
      * @param array $batchParticipations
      */
-    private function getParticipations(string $status, int $limit, array &$batchParticipations)
+    private function getParticipationsAndSave(string $status, int $limit, array &$batchParticipations)
     {
         $skip = 0;
+        $count = 0;
 
         do {
+            $this->info("Собираю $status - $count");
             //получаем clicked и read
             $participations = $this->getParticipationsByDates($status, $limit, $skip);
 
@@ -243,13 +230,21 @@ class ImportCampaignsSandSay extends Command
                 $indexTime = $isClick ? 3 : 2;
                 $email = $participation[0];
                 $issueId = (int)$participation[1];
-                if ($issueId === 351 && $isClick) {
-                    Log::info('data:', $participation);
-                }
                 $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$indexTime]);
+
+                // Принудительно сохраняем каждые N записей
+                if (count($batchParticipations) % 100 == 0) {
+                    $this->saveBatchDataParticipations($batchParticipations);
+                }
+            }
+
+            // Сохраняем остатки после каждого запроса к API
+            if (!empty($batchParticipations)) {
+                $this->saveBatchDataParticipations($batchParticipations);
             }
 
             $skip += $limit;
+            ++$count;
         } while (!empty($participations));
     }
 
@@ -288,9 +283,10 @@ class ImportCampaignsSandSay extends Command
     private function saveBatchDataParticipations(array &$batchParticipations): void
     {
         if (!empty($batchParticipations)) {
-            $this->withTableLock('sendsay_participation', function () use ($batchParticipations) {
-                SendsayParticipation::insert($batchParticipations);
-            });
+                $this->withTableLock('sendsay_participation', function () use ($batchParticipations) {
+                    SendsayParticipation::insert($batchParticipations);
+                });
+
             $batchParticipations = [];
 
             gc_mem_caches(); //очищаем кэши памяти Zend Engine
@@ -299,7 +295,7 @@ class ImportCampaignsSandSay extends Command
 
 
     /**
-     * Сохраняем расылку
+     * Сохраняем/обновляем рассылку
      * @param array $statData
      */
     private function createOrUpdateIssue(array $statData): void
@@ -400,7 +396,7 @@ class ImportCampaignsSandSay extends Command
         $common = array_merge($dataRequest[$status], [
             'first' => $limit,
             'skip' => $skip,
-            'missing_too' => 0
+            'missing_too' => 1
         ]);
 
         $response = SendSay::statUni($common);
@@ -474,9 +470,7 @@ class ImportCampaignsSandSay extends Command
             ? Carbon::createFromFormat('d.m.Y', $this->option('from'))->startOfDay()->format('Y-m-d')
             : Carbon::now()->subDay()->format('Y-m-d');
 
-        $this->toDate = $this->option('to')
-            ? Carbon::createFromFormat('d.m.Y', $this->option('to'))->endOfDay()->format('Y-m-d')
-            : Carbon::now()->subDay()->format('Y-m-d');
+        $this->toDate = Carbon::now()->subDay()->format('Y-m-d');
 
         $limit = (int)$this->option('limit');
         $sleep = (int)$this->option('sleep');
@@ -497,9 +491,10 @@ class ImportCampaignsSandSay extends Command
      */
     private function getIssuesList(): array
     {
+        //получать только обновленные в суточной команде
         $response = SendSay::issueList([
-            'from' => $this->fromDate,
-            'upto' => $this->toDate,
+            'from' => '2025-05-01',
+            'upto' => Carbon::now()->subDay()->format('Y-m-d')
         ]);
 
         return $response['list'] ?? [];
