@@ -210,13 +210,10 @@ class CreateMedicTables extends Migration
             $table->unsignedInteger('issue_id')->comment('ID sendsay рассылки');
             $table->string('email')->comment('E-mail');
             $table->string('result')->nullable()->comment('Результат отправки');
-            $table->tinyInteger('count')->nullable()->comment('Счётчик');
             $table->dateTime('update_time')->nullable()->comment('Время обновления');
 
             $table->index('issue_id');
             $table->index('email');
-            //уникальный индекс для предотвращения дублирования при пакетной вставке
-            $table->unique(['issue_id', 'email', 'count', 'update_time'], 'sendsay_participation_unique_action');
         });
 
         //Общая база

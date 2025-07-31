@@ -47,6 +47,16 @@ class ImportCampaignsSandSay extends Command
     private $batchSize = 500;
 
     /**
+     * @var string
+     */
+    private string $fromDate;
+
+    /**
+     * @var string
+     */
+    private string $toDate;
+
+    /**
      * Поля статистики, получаемые из API SendSay
      * @var array
      */
@@ -79,23 +89,23 @@ class ImportCampaignsSandSay extends Command
 
         try {
             $options = $this->validateOptions();
-            $issues = $this->getIssuesList($options['from'], $options['to']);
+            $issues = $this->getIssuesList();
 
             if (empty($issues)) {
                 $this->info('Нет рассылок за указанный период');
                 return CommandAlias::SUCCESS;
             }
 
-            $this->info("Сбор статистики с {$options['from']} по {$options['to']}");
+            $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
 
             $progressBar = new ProgressBar($this->output, count($issues));
             $progressBar->start();
 
+            $limit = $options['limit'];
             foreach ($issues as $issue) {
                 try {
-                    $this->processIssue($issue, $options['limit']);
+                    $this->processIssue($issue, $limit);
                     $progressBar->advance();
-
                     if ($options['sleep'] > 0) {
                         sleep($options['sleep']);
                     }
@@ -103,6 +113,14 @@ class ImportCampaignsSandSay extends Command
                     Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                     $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                 }
+            }
+
+            //собираем участия отдельно за дату от и до
+            try {
+                $this->processParticipations($limit);
+            } catch (\Exception $e) {
+                Log::channel('commands')->error("Ошибка обработки участий: " . $e->getMessage());
+                $this->warn(" [!] Ошибка обработки участий: " . $e->getMessage());
             }
 
             $progressBar->finish();
@@ -127,9 +145,8 @@ class ImportCampaignsSandSay extends Command
     {
         $issueId = $issue['id'];
         $isIssueCreated = false;
-        $batchContacts = [];
-        $batchParticipations = [];
         $batchCommonDB = [];
+        $batchContacts = [];
         $processedEmails = [];
         $batchCount = 0;
         $skip = 0;
@@ -145,11 +162,9 @@ class ImportCampaignsSandSay extends Command
 
             //создаем запись о рассылке при первом получении данных
             if (!$isIssueCreated) {
-                $this->createIssueIfNotExists($stats[0]);
+                $this->createOrUpdateIssue($stats[0]);
                 $isIssueCreated = true;
             }
-
-            $noParticipations = true;
 
             foreach ($stats as $stat) {
                 $email = $stat['member.email'];
@@ -157,25 +172,11 @@ class ImportCampaignsSandSay extends Command
                 if (!in_array($email, $processedEmails)) {
                     $processedEmails[] = $email;
 
-                    $statuses = ['click'/*, 'deliv'*/, 'read'];
-
-                    foreach ($statuses as $status) {
-                        $this->getParticipations($status, $issueId, $email, $limit, $batchParticipations, $noParticipations);
-                    }
-
-//                    if ($noParticipations) {
-//                        continue;
-//                    }
-
                     //подготавливаем общие данные
                     $batchCommonDB[] = [
                         'email' => $email
                     ];
                 }
-
-//                if ($noParticipations) {
-//                    continue;
-//                }
 
                 //подготавливаем контакты
                 $batchContacts[$email] = [
@@ -185,11 +186,6 @@ class ImportCampaignsSandSay extends Command
                 ];
 
                 $batchCount++;
-
-                //сохраняем при достижении размера пакета
-                if (count($batchParticipations) >= $this->batchSize) {
-                    $this->saveBatchDataParticipations($batchParticipations);
-                }
 
                 //сохраняем при достижении размера пакета
                 if ($batchCount >= $this->batchSize) {
@@ -202,78 +198,59 @@ class ImportCampaignsSandSay extends Command
             $hasMore = count($stats) === $limit;
         }
 
-        if (count($batchParticipations) > 0) {
-            $this->saveBatchDataParticipations($batchParticipations);
-        }
-
         //сохраняем оставшиеся данные
         if ($batchCount > 0) {
             $this->saveBatchData($batchContacts, $batchCommonDB);
         }
     }
 
-    private function getParticipations(string $status, int $issueId, string $email, int $limit, array &$batchParticipations, bool &$noParticipations)
+    private function processParticipations(int $limit)
     {
-        $countP = 1;
-        $skipP = 0;
-        $hasMoreP = true;
+        $statuses = ['click', 'read'/*, 'deliv'*/];
+        $batchParticipations = [];
+        foreach ($statuses as $status) {
+            //получаем статистику по кликам и чтению письма
+            $this->getParticipations($status, $limit, $batchParticipations);
 
-        while ($hasMoreP) {
-            //получить результат clicks, read и занести в пакет $batchParticipations
-            $participations = $this->getIssueStatsForEmail($status, $issueId, $email, $limit, $skipP);
-
-            if (empty($participations)) {
-                $hasMoreP = false;
-                continue;
+            //сохраняем при достижении размера пакета
+            if (count($batchParticipations) >= $this->batchSize) {
+                $this->saveBatchDataParticipations($batchParticipations);
             }
+        }
 
-            $noParticipations = false;
+        if (count($batchParticipations) > 0) {
+            $this->saveBatchDataParticipations($batchParticipations);
+        }
+    }
+
+    /**
+     * Получаем участия
+     * @param string $status
+     * @param int $limit
+     * @param array $batchParticipations
+     */
+    private function getParticipations(string $status, int $limit, array &$batchParticipations)
+    {
+        $skip = 0;
+
+        do {
+            //получаем clicked и read
+            $participations = $this->getParticipationsByDates($status, $limit, $skip);
 
             foreach ($participations as $participation) {
                 $isClick = $status === 'click';
                 $result = $isClick ? 'clicked' : 'read';
-                $index = $isClick ? 3 : 2;
-                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $countP, $participation[$index]);
-                ++$countP;
+                $indexTime = $isClick ? 3 : 2;
+                $email = $participation[0];
+                $issueId = (int)$participation[1];
+                if ($issueId === 351 && $isClick) {
+                    Log::info('data:', $participation);
+                }
+                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$indexTime]);
             }
 
-//                        click resp:
-//                        [
-//                            0 => [
-//                                0 => "alexnat1@yandex.ru"
-//                                1 => "356"
-//                                2 => "https://medtouch.oragen.ru/calendar/199"
-//                                3 => "1"
-//                                4 => "2025-07-28 19:01:05"
-//                              ],
-//                              ....
-//                        ]
-
-//                        deliv resp:
-//                        [
-//                           [
-//                                0 => "a.grabarnik@mail.ru"
-//                                1 => "356"
-//                                2 => "2025-07-28 19:01:05"
-//                                3 => "1"
-//                            ],
-//                            ....
-//                        ]
-
-//                        read resp:
-//                        [
-//                            [
-//                                0 => "a.grabarnik@mail.ru"
-//                                1 => "356"
-//                                2 => "2025-07-28 19:01:05"
-//                            ],
-//                            ....
-//                        ]
-
-            $skipP += $limit;
-            $hasMoreP = count($participations) === $limit;
-//          sleep(1);
-        }
+            $skip += $limit;
+        } while (!empty($participations));
     }
 
     /**
@@ -304,13 +281,19 @@ class ImportCampaignsSandSay extends Command
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 
+    /**
+     * Пакетная вставка участий
+     * @param array $batchParticipations
+     */
     private function saveBatchDataParticipations(array &$batchParticipations): void
     {
         if (!empty($batchParticipations)) {
             $this->withTableLock('sendsay_participation', function () use ($batchParticipations) {
-                SendsayParticipation::insertOrIgnore($batchParticipations);
+                SendsayParticipation::insert($batchParticipations);
             });
             $batchParticipations = [];
+
+            gc_mem_caches(); //очищаем кэши памяти Zend Engine
         }
     }
 
@@ -319,29 +302,27 @@ class ImportCampaignsSandSay extends Command
      * Сохраняем расылку
      * @param array $statData
      */
-    private function createIssueIfNotExists(array $statData): void
+    private function createOrUpdateIssue(array $statData): void
     {
         $issueId = $statData['issue.id'];
 
-        if (SendsayIssue::where('id', $issueId)->exists()) {
-            return;
-        }
-
         $this->withTableLock('sendsay_issue', function () use ($issueId, $statData) {
-            SendsayIssue::create([
-                'id' => $issueId,
-                'issue_name' => $statData['issue.name'],
-                'send_date' => Carbon::parse($statData['issue.dt']),
-                'sent' => $statData['issue.members'],
-                'delivered' => $statData['issue.deliv_ok'],
-                'opened' => $statData['issue.readed'],
-                'open_per_unique' => $statData['issue.u_readed'],
-                'clicked' => $statData['issue.clicked'],
-                'clicks_per_unique' => $statData['issue.u_clicked'],
-                'delivery_rate' => $this->calculateRate($statData['issue.members'], $statData['issue.deliv_ok']),
-                'open_rate' => $this->calculateRate($statData['issue.deliv_ok'], $statData['issue.readed']),
-                'ctr' => $this->calculateRate($statData['issue.deliv_ok'], $statData['issue.clicked']),
-                'ctor' => $this->calculateRate($statData['issue.readed'], $statData['issue.clicked']),
+            SendsayIssue::updateOrCreate(
+                ['id' => $issueId],
+                [
+                    'id' => $issueId,
+                    'issue_name' => $statData['issue.name'],
+                    'send_date' => Carbon::parse($statData['issue.dt']),
+                    'sent' => $statData['issue.members'],
+                    'delivered' => $statData['issue.deliv_ok'],
+                    'opened' => $statData['issue.readed'],
+                    'open_per_unique' => $statData['issue.u_readed'],
+                    'clicked' => $statData['issue.clicked'],
+                    'clicks_per_unique' => $statData['issue.u_clicked'],
+                    'delivery_rate' => $this->calculateRate($statData['issue.members'], $statData['issue.deliv_ok']),
+                    'open_rate' => $this->calculateRate($statData['issue.deliv_ok'], $statData['issue.readed']),
+                    'ctr' => $this->calculateRate($statData['issue.deliv_ok'], $statData['issue.clicked']),
+                    'ctor' => $this->calculateRate($statData['issue.readed'], $statData['issue.clicked']),
             ]);
         });
     }
@@ -373,71 +354,95 @@ class ImportCampaignsSandSay extends Command
     /**
      * Получаем данные по кликам, доставке, чтению, по конкретной рассылке для конкретного email
      * @param string $status
-     * @param string $issueId
-     * @param string $email
      * @param int $limit
      * @param int $skip
      * @return array
      */
-    private function getIssueStatsForEmail(string $status, string $issueId, string $email, int $limit, int $skip = 0): array
+    private function getParticipationsByDates(string $status, int $limit, int $skip = 0): array
     {
+        $from = $this->fromDate . ' 00:00:00';
+        $to = $this->toDate . ' 23:59:59';
+
+        $filter = [
+            ['a' => "{$status}.dt", 'op' => '>=', 'v' => $from],
+            ['a' => "{$status}.dt", 'op' => '<=', 'v' => $to]
+        ];
+
         $dataRequest = [
             'click' => [
-                'select' => [     //Количество кликов по каждой ссылке выпуске для конкретного емейла
+                'select' => [               //клики по ссылкам в письме
                     "click.member.email",
                     "click.issue.id",
                     "click.link.url",
-//                    "count(*)",           //общий подсчёт кликов по ссылкам (не считаем, стобы выдало весь список)...
-                    "click.dt",        //время я так понимаю выдаёт последнего клика...
+                    "click.dt",
                 ],
-                'filter' => [
-                    ['a' => 'issue.id', 'op' => '==', 'v' => $issueId],
-                    ['a' => 'click.member.email', 'op' => '==', 'v' => $email]
-                ],
+                'filter' => $filter
             ],
             'deliv' => [
-                'select' => [               //статус доставки
+                'select' => [               //доставка
                     "deliv.member.email",
                     "deliv.issue.id",
-                    "deliv.issue.dt",
+                    "deliv.dt",
                     "deliv.status"
                 ],
-                'filter' => [
-                    ['a' => 'issue.id', 'op' => '==', 'v' => $issueId],
-                    ['a' => 'deliv.member.email', 'op' => '==', 'v' => $email]
-                ],
+                'filter' => $filter
             ],
             'read' => [
-                'select' => [               //статус чтения письма
+                'select' => [               //чтения письма
                     "read.member.email",
                     "read.issue.id",
                     "read.dt",
                 ],
-                'filter' => [
-                    ['a' => 'issue.id', 'op' => '==', 'v' => $issueId],
-                    ['a' => 'read.member.email', 'op' => '==', 'v' => $email]
-                ],
+                'filter' => $filter
             ]
         ];
 
         $common = array_merge($dataRequest[$status], [
             'first' => $limit,
             'skip' => $skip,
-            'missing_too' => 1
+            'missing_too' => 0
         ]);
 
         $response = SendSay::statUni($common);
-//        if (!empty($response['errors'])) {
-//            $this->error('err:', $response);
-//        }
-//
-//        if (!empty($response['list']) && count($response['list']) > 1) {
-//            if ($status === 'click') {
-//                dd($response['list']);
-//            }
-//        }
+
+
+        if(!empty($response['errors']) || !empty($response['error'])) {
+            Log::error('err:', $response);
+        }
 
         return $response['list'] ?? [];
+
+//                        click resp:
+//                        [
+//                            0 => [
+//                                0 => "alexnat1@yandex.ru"
+//                                1 => "356"
+//                                2 => "https://medtouch.oragen.ru/calendar/199"
+//                                4 => "2025-07-28 19:01:05"
+//                              ],
+//                              ....
+//                        ]
+
+//                        deliv resp:
+//                        [
+//                           [
+//                                0 => "a.grabarnik@mail.ru"
+//                                1 => "356"
+//                                2 => "2025-07-28 19:01:05"
+//                                3 => "1"
+//                            ],
+//                            ....
+//                        ]
+
+//                        read resp:
+//                        [
+//                            [
+//                                0 => "a.grabarnik@mail.ru"
+//                                1 => "356"
+//                                2 => "2025-07-28 19:01:05"
+//                            ],
+//                            ....
+//                        ]
     }
 
     /**
@@ -445,18 +450,16 @@ class ImportCampaignsSandSay extends Command
      * @param int $issueId
      * @param string $email
      * @param string $result
-     * @param int $count
      * @param string|null $time
      * @return array
      */
-    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'count' => "int", 'update_time' => "\Carbon\Carbon|null"])]
-    private function prepareParticipationResult(int $issueId, string $email, string $result, int $count, string $time = null): array
+    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null"])]
+    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null): array
     {
         return [
             'issue_id' => $issueId,
             'email' => $email,
             'result' => $result,
-            'count' => $count,
             'update_time' => !empty($time) ? Carbon::parse($time) : null,
         ];
     }
@@ -467,13 +470,13 @@ class ImportCampaignsSandSay extends Command
      */
     private function validateOptions(): array
     {
-        $fromDate = $this->option('from')
+        $this->fromDate = $this->option('from')
             ? Carbon::createFromFormat('d.m.Y', $this->option('from'))->startOfDay()->format('Y-m-d')
-            : Carbon::now()->subDays(2)->format('Y-m-d');
+            : Carbon::now()->subDay()->format('Y-m-d');
 
-        $toDate = $this->option('to')
+        $this->toDate = $this->option('to')
             ? Carbon::createFromFormat('d.m.Y', $this->option('to'))->endOfDay()->format('Y-m-d')
-            : Carbon::now()->subDays(2)->format('Y-m-d');
+            : Carbon::now()->subDay()->format('Y-m-d');
 
         $limit = (int)$this->option('limit');
         $sleep = (int)$this->option('sleep');
@@ -483,8 +486,6 @@ class ImportCampaignsSandSay extends Command
         }
 
         return [
-            'from' => $fromDate,
-            'to' => $toDate,
             'limit' => $limit,
             'sleep' => $sleep
         ];
@@ -492,15 +493,13 @@ class ImportCampaignsSandSay extends Command
 
     /**
      * Получаем все рассылки, согласно периоду
-     * @param string $from
-     * @param string $to
      * @return array
      */
-    private function getIssuesList(string $from, string $to): array
+    private function getIssuesList(): array
     {
         $response = SendSay::issueList([
-            'from' => $from,
-            'upto' => $to,
+            'from' => $this->fromDate,
+            'upto' => $this->toDate,
         ]);
 
         return $response['list'] ?? [];
