@@ -24,7 +24,7 @@ class ImportByApiV2 extends Common
 
     protected $signature = 'import:new-mt-touches
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=100 : Колличество записей за один запрос}';
+                            {--pageSize=500 : Колличество записей за один запрос}';
 
     protected $description = 'Импорт касаний нового сайта МедТач, в ограниченной памяти';
 
@@ -468,10 +468,11 @@ class ImportByApiV2 extends Common
      * @param array $waveData       Данные волны
      * @return array
      */
-    #[ArrayShape(['project' => "mixed", 'wave' => "mixed", 'date_time' => "string"])]
+    #[ArrayShape(['id' => "mixed", 'project' => "mixed", 'wave' => "mixed", 'date_time' => "string"])]
     private function prepareProjectData(array $projectData, array $waveData): array
     {
         return [
+            'id' => $projectData['id'],
             'project' => $projectData['name'],
             'wave' => $waveData['name'],
             'date_time' => Carbon::parse($projectData['created_at'])->format('Y-m-d H:i:s')

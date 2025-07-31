@@ -150,7 +150,6 @@ class ImportCampaignsSandSay extends Command
             }
 
             $noParticipations = true;
-            $isEmptyParticipations = ['true', 'true', 'true'];
 
             foreach ($stats as $stat) {
                 $email = $stat['member.email'];
@@ -161,45 +160,82 @@ class ImportCampaignsSandSay extends Command
                     $statuses = ['click'/*, 'deliv'*/, 'read'];
 
                     foreach ($statuses as $status) {
-                        $countP = 1;
-                        $skipP = 0;
-                        $hasMoreP = true;
+                        $this->getParticipations($status, $issueId, $email, $limit, $batchParticipations, $noParticipations);
+                    }
 
-                        while ($hasMoreP) {
-                            //получить результат clicks, read и занести в пакет $batchParticipations
-                            $participations = $this->getIssueStatsForEmail($status, $issueId, $email, $limit, $skipP);
+//                    if ($noParticipations) {
+//                        continue;
+//                    }
 
-                            if (empty($participations)) {
-                                $hasMoreP = false;
-                                continue;
-                            }
-                            foreach ($participations as $participation) {
-                                if ($status === 'click') {
-                                    $testDataClick[] = $participation;
-                                    //подготавливаем участие кликов по ссылкам в письме
-                                    $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, 'clicked', $countP, $participation[3]);
-                                    $isEmptyParticipations[0] = 'false';
-                                }
+                    //подготавливаем общие данные
+                    $batchCommonDB[] = [
+                        'email' => $email
+                    ];
+                }
 
-//                                if ($status === 'deliv') {
-//                                    //подготавливаем участие кликов по ссылкам в письме
-//                                    $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, ((bool)$participation[3] ? '' : 'not_' ) . 'delivered', $participation[2]);
-//                                    $isEmptyParticipations[1] = 'false';
-//                                }
+//                if ($noParticipations) {
+//                    continue;
+//                }
 
-                                if ($status === 'read') {
-                                    $testDataRead[] = $participation;
-                                    //подготавливаем участия чтения письма
-                                    $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, 'read', $countP, $participation[2]);
-                                    $isEmptyParticipations[2] = 'false';
-                                }
-                                ++$countP;
+                //подготавливаем контакты
+                $batchContacts[$email] = [
+                    'email' => $email,
+                    'email_status' => $stat['member.haslock'] == '0' ? 'active' : 'blocked',
+                    'email_availability' => $stat['member.haslock'] == '0',
+                ];
 
-                                //сохраняем при достижении размера пакета
-                                if (count($batchParticipations) >= $this->batchSize) {
-                                    $this->saveBatchDataParticipations($batchParticipations);
-                                }
-                            }
+                $batchCount++;
+
+                //сохраняем при достижении размера пакета
+                if (count($batchParticipations) >= $this->batchSize) {
+                    $this->saveBatchDataParticipations($batchParticipations);
+                }
+
+                //сохраняем при достижении размера пакета
+                if ($batchCount >= $this->batchSize) {
+                    $this->saveBatchData($batchContacts, $batchCommonDB);
+                    $batchCount = 0;
+                }
+            }
+
+            $skip += $limit;
+            $hasMore = count($stats) === $limit;
+        }
+
+        if (count($batchParticipations) > 0) {
+            $this->saveBatchDataParticipations($batchParticipations);
+        }
+
+        //сохраняем оставшиеся данные
+        if ($batchCount > 0) {
+            $this->saveBatchData($batchContacts, $batchCommonDB);
+        }
+    }
+
+    private function getParticipations(string $status, int $issueId, string $email, int $limit, array &$batchParticipations, bool &$noParticipations)
+    {
+        $countP = 1;
+        $skipP = 0;
+        $hasMoreP = true;
+
+        while ($hasMoreP) {
+            //получить результат clicks, read и занести в пакет $batchParticipations
+            $participations = $this->getIssueStatsForEmail($status, $issueId, $email, $limit, $skipP);
+
+            if (empty($participations)) {
+                $hasMoreP = false;
+                continue;
+            }
+
+            $noParticipations = false;
+
+            foreach ($participations as $participation) {
+                $isClick = $status === 'click';
+                $result = $isClick ? 'clicked' : 'read';
+                $index = $isClick ? 3 : 2;
+                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $countP, $participation[$index]);
+                ++$countP;
+            }
 
 //                        click resp:
 //                        [
@@ -234,53 +270,9 @@ class ImportCampaignsSandSay extends Command
 //                            ....
 //                        ]
 
-                            $skipP += $limit;
-                            $hasMoreP = count($participations) === $limit;
-//                            sleep(1);
-                        }
-                    }
-
-                    if ($noParticipations = !in_array('false', $isEmptyParticipations)) {
-                        continue;
-                    }
-
-                    //подготавливаем общие данные
-                    $batchCommonDB[] = [
-                        'email' => $email
-                    ];
-                }
-
-                if ($noParticipations) {
-                    continue;
-                }
-
-                //подготавливаем контакты
-                $batchContacts[$email] = [
-                    'email' => $email,
-                    'email_status' => $stat['member.haslock'] == '0' ? 'active' : 'blocked',
-                    'email_availability' => $stat['member.haslock'] == '0',
-                ];
-
-                $batchCount++;
-
-                //сохраняем при достижении размера пакета
-                if ($batchCount >= $this->batchSize) {
-                    $this->saveBatchData($batchContacts, $batchCommonDB);
-                    $batchCount = 0;
-                }
-            }
-
-            $skip += $limit;
-            $hasMore = count($stats) === $limit;
-        }
-
-        if (count($batchParticipations) > 0) {
-            $this->saveBatchDataParticipations($batchParticipations);
-        }
-
-        //сохраняем оставшиеся данные
-        if ($batchCount > 0) {
-            $this->saveBatchData($batchContacts, $batchCommonDB);
+            $skipP += $limit;
+            $hasMoreP = count($participations) === $limit;
+//          sleep(1);
         }
     }
 
@@ -396,7 +388,7 @@ class ImportCampaignsSandSay extends Command
                     "click.issue.id",
                     "click.link.url",
 //                    "count(*)",           //общий подсчёт кликов по ссылкам (не считаем, стобы выдало весь список)...
-                    "click.issue.dt"        //время я так понимаю выдаёт последнего клика...
+                    "click.dt",        //время я так понимаю выдаёт последнего клика...
                 ],
                 'filter' => [
                     ['a' => 'issue.id', 'op' => '==', 'v' => $issueId],
@@ -419,7 +411,7 @@ class ImportCampaignsSandSay extends Command
                 'select' => [               //статус чтения письма
                     "read.member.email",
                     "read.issue.id",
-                    "read.issue.dt",
+                    "read.dt",
                 ],
                 'filter' => [
                     ['a' => 'issue.id', 'op' => '==', 'v' => $issueId],
@@ -435,9 +427,12 @@ class ImportCampaignsSandSay extends Command
         ]);
 
         $response = SendSay::statUni($common);
-
-//        if (!empty($response['list'])/* && count($response['list']) > 1*/) {
-//            if ($status === 'deliv') {
+//        if (!empty($response['errors'])) {
+//            $this->error('err:', $response);
+//        }
+//
+//        if (!empty($response['list']) && count($response['list']) > 1) {
+//            if ($status === 'click') {
 //                dd($response['list']);
 //            }
 //        }

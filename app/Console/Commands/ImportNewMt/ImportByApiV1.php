@@ -23,7 +23,8 @@ class ImportByApiV1 extends Common
 
     protected $signature = 'import:new-mt-users
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=100 : Колличество записей за один запрос}';
+                            {--pageSize=500 : Колличество записей за один запрос}
+                            {--onlyUsers=0 : Только пользователей}';
 
     protected $description = 'Импорт пользователей нового сайта МедТач, в ограниченной памяти';
 
@@ -48,6 +49,7 @@ class ImportByApiV1 extends Common
     {
         $updatedAfter = $this->option('updated_after');
         $this->pageSize = $this->option('pageSize');
+        $onlyUsers = $this->option('onlyUsers');
         $queryParams = [
             'updated_after' => $updatedAfter
                 ? Carbon::parse($updatedAfter)->startOfDay()->format('Y-m-d H:i:s.v')
@@ -59,8 +61,10 @@ class ImportByApiV1 extends Common
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
             $this->processUserData($queryParams);
-            $this->processEventsData($queryParams);
-            $this->processQuizData($queryParams);
+            if (!(bool)$onlyUsers) {
+                $this->processEventsData($queryParams);
+                $this->processQuizData($queryParams);
+            }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
@@ -96,7 +100,7 @@ class ImportByApiV1 extends Common
 
                 $response = $this->getData('outer/user', $queryParams, $page);
 
-                if (empty($data = $response['data'])) {
+                if (empty($response) || empty($data = $response['data'])) {
                     break;
                 }
                 foreach ($data as $userData) {
@@ -255,7 +259,7 @@ class ImportByApiV1 extends Common
             try {
                 $response = $this->getData('outer/event', $queryParams, $page);
 
-                if (empty($data = $response['data'])) {
+                if (empty($response) || empty($data = $response['data'])) {
                     break;
                 }
 
@@ -353,7 +357,7 @@ class ImportByApiV1 extends Common
             while ($hasMorePages) {
                 $response = $this->getData("outer/event/$eventId/$format", $queryParams, $page);
 
-                if (empty($data = $response['data'])) {
+                if (empty($response) || empty($data = $response['data'])) {
                     break;
                 }
 
@@ -443,7 +447,7 @@ class ImportByApiV1 extends Common
             while ($hasMorePages) {
                 $response = $this->getData("outer/qts", $queryParams, $page);
 
-                if (empty($data = $response['data'])) {
+                if (empty($response) || empty($data = $response['data'])) {
                     break;
                 }
 
