@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Symfony\Component\Console\Helper\ProgressBar;
 
+
+//todo: сделать отдельную таблицу и записывать в неё (без common_database и users_mt)
 class ImportTelegramUsers extends Command
 {
     use WriteLockTrait;

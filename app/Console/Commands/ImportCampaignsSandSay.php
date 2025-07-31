@@ -19,6 +19,8 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
 
 /**
  * Команда для импорта статистики рассылок из SendSay в базу данных
+ *
+ * !!! Забирать данные now - 2 days, иначе баг выборки по датам
  */
 class ImportCampaignsSandSay extends Command
 {
@@ -472,11 +474,11 @@ class ImportCampaignsSandSay extends Command
     {
         $fromDate = $this->option('from')
             ? Carbon::createFromFormat('d.m.Y', $this->option('from'))->startOfDay()->format('Y-m-d')
-            : Carbon::now()->subDay()->startOfDay()->format('Y-m-d');
+            : Carbon::now()->subDays(2)->format('Y-m-d');
 
         $toDate = $this->option('to')
             ? Carbon::createFromFormat('d.m.Y', $this->option('to'))->endOfDay()->format('Y-m-d')
-            : Carbon::now()->subDay()->endOfDay()->format('Y-m-d');
+            : Carbon::now()->subDays(2)->format('Y-m-d');
 
         $limit = (int)$this->option('limit');
         $sleep = (int)$this->option('sleep');
