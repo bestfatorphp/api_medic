@@ -88,39 +88,39 @@ class ImportCampaignsSandSay extends Command
 
         try {
             $options = $this->validateOptions();
-//            $issues = $this->getIssuesList();
-//
-//            if (empty($issues)) {
-//                $this->info('Нет рассылок за указанный период');
-//                return CommandAlias::SUCCESS;
-//            }
-//
-//            $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
-//
-//            $progressBar = new ProgressBar($this->output, count($issues));
-//            $progressBar->start();
-//
-//            $limit = $options['limit'];
-//            foreach ($issues as $issue) {
-//                try {
-//                    $this->processIssue($issue, $limit);
-//                    $progressBar->advance();
-//                    if ($options['sleep'] > 0) {
-//                        sleep($options['sleep']);
-//                    }
-//                } catch (\Exception $e) {
-//                    Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
-//                    $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
-//                }
-//            }
-//
-//            $this->newLine();
-//            $this->info('Собираю clicks и read');
-//
-//            //собираем участия отдельно за дату от и до
-//            $this->processParticipations($limit);
-//
-//            $progressBar->finish();
+            $issues = $this->getIssuesList();
+
+            if (empty($issues)) {
+                $this->info('Нет рассылок за указанный период');
+                return CommandAlias::SUCCESS;
+            }
+
+            $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
+
+            $progressBar = new ProgressBar($this->output, count($issues));
+            $progressBar->start();
+
+            $limit = $options['limit'];
+            foreach ($issues as $issue) {
+                try {
+                    $this->processIssue($issue, $limit);
+                    $progressBar->advance();
+                    if ($options['sleep'] > 0) {
+                        sleep($options['sleep']);
+                    }
+                } catch (\Exception $e) {
+                    Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
+                    $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
+                }
+            }
+
+            $this->newLine();
+            $this->info('Собираю clicks и read');
+
+            //собираем участия отдельно за дату от и до
+            $this->processParticipations($limit);
+
+            $progressBar->finish();
             $this->newLine();
             $this->info("Отновляем рассылки, данными по {$this->toDate}");
 
