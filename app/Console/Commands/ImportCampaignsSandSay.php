@@ -88,41 +88,46 @@ class ImportCampaignsSandSay extends Command
 
         try {
             $options = $this->validateOptions();
-            $issues = $this->getIssuesList();
+//            $issues = $this->getIssuesList();
+//
+//            if (empty($issues)) {
+//                $this->info('Нет рассылок за указанный период');
+//                return CommandAlias::SUCCESS;
+//            }
+//
+//            $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
+//
+//            $progressBar = new ProgressBar($this->output, count($issues));
+//            $progressBar->start();
+//
+//            $limit = $options['limit'];
+//            foreach ($issues as $issue) {
+//                try {
+//                    $this->processIssue($issue, $limit);
+//                    $progressBar->advance();
+//                    if ($options['sleep'] > 0) {
+//                        sleep($options['sleep']);
+//                    }
+//                } catch (\Exception $e) {
+//                    Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
+//                    $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
+//                }
+//            }
+//
+//            $this->newLine();
+//            $this->info('Собираю clicks и read');
+//
+//            //собираем участия отдельно за дату от и до
+//            $this->processParticipations($limit);
+//
+//            $progressBar->finish();
+            $this->newLine();
+            $this->info("Отновляем рассылки, данными по {$this->toDate}");
 
-            if (empty($issues)) {
-                $this->info('Нет рассылок за указанный период');
-                return CommandAlias::SUCCESS;
-            }
-
-            $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
-
-            $progressBar = new ProgressBar($this->output, count($issues));
-            $progressBar->start();
-
-            $limit = $options['limit'];
-            foreach ($issues as $issue) {
-                try {
-                    $this->processIssue($issue, $limit);
-                    $progressBar->advance();
-                    if ($options['sleep'] > 0) {
-                        sleep($options['sleep']);
-                    }
-                } catch (\Exception $e) {
-                    Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
-                    $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
-                }
-            }
+            //обновляем данные
+            $this->getActualStatsIssues();
 
             $this->newLine();
-            $this->info('Собираю clicks и read');
-
-            //собираем участия отдельно за дату от и до
-            $this->processParticipations($limit);
-
-            $progressBar->finish();
-            $this->newLine();
-
             $this->info("\nСбор статистики завершен успешно");
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
@@ -130,6 +135,48 @@ class ImportCampaignsSandSay extends Command
             CustomLog::errorLog(__CLASS__, 'commands', $e);
             return CommandAlias::FAILURE;
         }
+    }
+
+    private function getActualStatsIssues()
+    {
+        $issues = SendsayIssue::query()
+            ->select(['id', 'delivered'])
+            ->get();
+
+        foreach ($issues as $issue) {
+            $stats = $this->getActualStats($issue->id);
+            $this->updateIssueStats($issue, $stats);
+        }
+    }
+
+    private function getActualStats(int $issueId): array
+    {
+        return [
+            'clicked' => SendsayParticipation::query()
+                ->where('issue_id', $issueId)
+                ->where('result', 'clicked')
+                ->count(),
+
+            'read' => SendsayParticipation::query()
+                ->where('issue_id', $issueId)
+                ->where('result', 'read')
+                ->count(),
+        ];
+    }
+
+    private function updateIssueStats(SendsayIssue $issue, array $stats): void
+    {
+        $delivered = $issue->delivered;
+        $clicked = $stats['clicked'];
+        $read = $stats['read'];
+
+        $issue->update([
+            'clicked' => $clicked,
+            'opened' => $read,
+            'open_rate' => $this->calculateRate($delivered, $read),
+            'ctr' => $this->calculateRate($delivered, $clicked),
+            'ctor' => $this->calculateRate($read, $clicked),
+        ]);
     }
 
     /**
