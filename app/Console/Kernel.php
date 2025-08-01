@@ -18,10 +18,10 @@ class Kernel extends ConsoleKernel
     {
         $commonPath = 'logs/';
 
-        $schedule->command('import:sendsay-stats --from=01.05.2025')
-            ->yearlyOn(now()->month, now()->day, '02:00')
-            ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay-cn.log"));
+//        $schedule->command('import:sendsay-stats --from=01.05.2025')
+//            ->yearlyOn(now()->month, now()->day, '02:00')
+//            ->timezone('Europe/Moscow')
+//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay-cn.log"));
 
         $schedule->command('import:sendsay-stats')
             ->dailyAt('00:10')
