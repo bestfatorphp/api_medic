@@ -122,7 +122,7 @@ class ImportCampaignsSandSay extends Command
 
             $progressBar->finish();
             $this->newLine();
-            $this->info("Отновляем рассылки, данными по {$this->toDate}");
+            $this->info("Обновляем рассылки, данными по {$this->toDate}");
 
             //обновляем данные
             $this->getActualStatsIssues();
@@ -135,48 +135,6 @@ class ImportCampaignsSandSay extends Command
             CustomLog::errorLog(__CLASS__, 'commands', $e);
             return CommandAlias::FAILURE;
         }
-    }
-
-    private function getActualStatsIssues()
-    {
-        $issues = SendsayIssue::query()
-            ->select(['id', 'delivered'])
-            ->get();
-
-        foreach ($issues as $issue) {
-            $stats = $this->getActualStats($issue->id);
-            $this->updateIssueStats($issue, $stats);
-        }
-    }
-
-    private function getActualStats(int $issueId): array
-    {
-        return [
-            'clicked' => SendsayParticipation::query()
-                ->where('issue_id', $issueId)
-                ->where('result', 'clicked')
-                ->count(),
-
-            'read' => SendsayParticipation::query()
-                ->where('issue_id', $issueId)
-                ->where('result', 'read')
-                ->count(),
-        ];
-    }
-
-    private function updateIssueStats(SendsayIssue $issue, array $stats): void
-    {
-        $delivered = $issue->delivered;
-        $clicked = $stats['clicked'];
-        $read = $stats['read'];
-
-        $issue->update([
-            'clicked' => $clicked,
-            'opened' => $read,
-            'open_rate' => $this->calculateRate($delivered, $read),
-            'ctr' => $this->calculateRate($delivered, $clicked),
-            'ctor' => $this->calculateRate($read, $clicked),
-        ]);
     }
 
     /**
@@ -210,19 +168,22 @@ class ImportCampaignsSandSay extends Command
             foreach ($stats as $stat) {
                 $email = $stat['member.email'];
 
+                $email_status = $stat['member.haslock'] == '0' ? 'active' : 'blocked';
+
                 if (!in_array($email, $processedEmails)) {
                     $processedEmails[] = $email;
 
                     //подготавливаем общие данные
                     $batchCommonDB[] = [
-                        'email' => $email
+                        'email' => $email,
+                        'email_status' => $email_status
                     ];
                 }
 
                 //подготавливаем контакты
                 $batchContacts[$email] = [
                     'email' => $email,
-                    'email_status' => $stat['member.haslock'] == '0' ? 'active' : 'blocked',
+                    'email_status' => $email_status,
                     'email_availability' => $stat['member.haslock'] == '0',
                 ];
 
@@ -315,7 +276,11 @@ class ImportCampaignsSandSay extends Command
 
         if (!empty($batchCommonDB)) {
             $this->withTableLock('common_database', function () use ($batchCommonDB) {
-                CommonDatabase::upsert($batchCommonDB, ['email']);
+                CommonDatabase::upsert(
+                    $batchCommonDB,
+                    ['email'],
+                    ['email_status']
+                );
             });
             $batchCommonDB = [];
         }
@@ -511,6 +476,7 @@ class ImportCampaignsSandSay extends Command
      * Обрабатываем параметры команды
      * @return array
      */
+    #[ArrayShape(['limit' => "int", 'sleep' => "int"])]
     private function validateOptions(): array
     {
         $this->fromDate = $this->option('from')
@@ -545,6 +511,62 @@ class ImportCampaignsSandSay extends Command
         ]);
 
         return $response['list'] ?? [];
+    }
+
+    /**
+     * Актуализируем согласно собранным click и read
+     */
+    private function getActualStatsIssues()
+    {
+        $issues = SendsayIssue::query()
+            ->select(['id', 'delivered'])
+            ->get();
+
+        foreach ($issues as $issue) {
+            $stats = $this->getActualStats($issue->id);
+            $this->updateIssueStats($issue, $stats);
+        }
+    }
+
+    /**
+     * Считаем click и read
+     * @param int $issueId
+     * @return array
+     */
+    #[ArrayShape(['clicked' => "int", 'read' => "int"])]
+    private function getActualStats(int $issueId): array
+    {
+        return [
+            'clicked' => SendsayParticipation::query()
+                ->where('issue_id', $issueId)
+                ->where('result', 'clicked')
+                ->count(),
+
+            'read' => SendsayParticipation::query()
+                ->where('issue_id', $issueId)
+                ->where('result', 'read')
+                ->count(),
+        ];
+    }
+
+    /**
+     * Обновляем запись рассылки
+     * @param SendsayIssue $issue
+     * @param array $stats
+     */
+    private function updateIssueStats(SendsayIssue $issue, array $stats): void
+    {
+        $delivered = $issue->delivered;
+        $clicked = $stats['clicked'];
+        $read = $stats['read'];
+
+        $issue->update([
+            'clicked' => $clicked,
+            'opened' => $read,
+            'open_rate' => $this->calculateRate($delivered, $read),
+            'ctr' => $this->calculateRate($delivered, $clicked),
+            'ctor' => $this->calculateRate($read, $clicked),
+        ]);
     }
 
     /**

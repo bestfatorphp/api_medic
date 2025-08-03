@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Symfony\Component\Panther\Client;
 
-//todo: Перед использованием, установки на сервере для Panther
+//todo: Перед использованием, установки на сервере для Panther (какие здесь id user, new_mt_id или old_mt_id)
 class ImportMTHeliosFile extends Command
 {
     use WriteLockTrait;

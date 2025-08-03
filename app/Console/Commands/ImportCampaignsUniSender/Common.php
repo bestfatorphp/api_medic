@@ -3,7 +3,6 @@
 namespace App\Console\Commands\ImportCampaignsUniSender;
 
 use App\Facades\UniSender;
-use App\Models\CommonDatabase;
 use App\Models\UnisenderCampaign;
 use App\Models\UnisenderContact;
 use App\Models\UnisenderParticipation;
@@ -257,13 +256,12 @@ class Common extends Command
         $batchSize = 500; //размер партии для обработки
         $totalEmails = count($emails);
         $batchContacts = [];
-        $batchCommonDB = [];
 
         //создаем прогресс-бар
         $progressBar = $this->output->createProgressBar($totalEmails);
         $progressBar->start();
 
-        foreach (array_chunk($emails, $batchSize) as $index => $emailBatch) {
+        foreach (array_chunk($emails, $batchSize) as $emailBatch) {
             foreach ($emailBatch as $email) {
                 try {
                     $contact = UniSender::getContact($email, [
@@ -282,16 +280,6 @@ class Common extends Command
                         'email_availability' => $contact['email']['availability'] === "available",
                     ];
 
-                    //формируем данные для таблицы common_database
-                    $batchCommonDB[] = [
-                        'email' => $email,
-                        'full_name' => $contact['fields']['ФИО'] ?? null,
-                        'city' => $contact['fields']['Город'] ?? null,
-                        'specialty' => $contact['fields']['специальность'] ?? null,
-                        'phone' => $contact['phone']['phone'] ?? null,
-                        'registration_date' => null,
-                        'email_status' => $contact['email']['status'],
-                    ];
                 } catch (\Exception $e) {
                     Log::channel('commands')->error(__CLASS__ . "Ошибка при получении данных для email {$email}. Error: " . $e->getMessage());
                     continue; //пропускаем email, если произошла ошибка
@@ -307,12 +295,6 @@ class Common extends Command
                     UnisenderContact::upsert($batchContacts, ['email']);
                 });
                 $batchContacts = [];
-            }
-            if (!empty($batchCommonDB)) {
-                $this->withTableLock('common_database', function () use ($batchCommonDB) {
-                    CommonDatabase::upsert($batchCommonDB, ['email']);
-                });
-                $batchCommonDB = [];
             }
         }
 

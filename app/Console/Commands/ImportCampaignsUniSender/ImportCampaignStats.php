@@ -19,7 +19,7 @@ class ImportCampaignStats extends Common
     /**
      * @var string
      */
-    protected $description = 'Сбор детализированной статистики UniSender по рассылкам';
+    protected $description = 'Сбор детализированной статистики UniSender по рассылкам (разовая команда)';
 
     /**
      * Лимит количества кампаний за один запрос к API (пагинация).

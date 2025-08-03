@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands\ImportNewMt;
 
-use App\Helpers\DBHelper;
 use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
@@ -165,8 +164,7 @@ class ImportByApiV1 extends Common
         DB::transaction(function () use ($usersMTBatch, $commonDBBatch) {
 
             $this->withTableLock('users_mt', function () use ($usersMTBatch) {
-                DBHelper::upsertWithNullCheck(
-                    new UserMT(),
+                UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
                     ['new_mt_id', 'full_name', 'email', 'registration_date', 'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
@@ -187,8 +185,7 @@ class ImportByApiV1 extends Common
                 $commonDBBatch
             );
             $this->withTableLock('common_database', function () use ($commonDBBatch) {
-                DBHelper::upsertWithNullCheck(
-                    new CommonDatabase(),
+                CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
                     ['full_name', 'mt_user_id', 'registration_date', 'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
@@ -209,7 +206,7 @@ class ImportByApiV1 extends Common
             'new_mt_id' => $userData['id'],
             'full_name' => $fullName,
             'email' => $userData['email'],
-            'registration_date' => Carbon::parse($userData['created_at'])->format('Y-m-d'),
+            'registration_date' => $userData['created_at'],
             'gender' => $userData['gender'] ?? null,
             'birth_date' => isset($userData['birthdate']) ? Carbon::parse($userData['birthdate'])->format('Y-m-d') : null,
             'specialty' => $userData['speciality'] ?? null,
@@ -228,10 +225,11 @@ class ImportByApiV1 extends Common
     protected function prepareCommonDBData(array $userData, string $fullName): array
     {
         return [
+            'new_mt_id' => $userData['id'],
             'full_name' => $fullName,
             'email' => $userData['email'],
             'mt_user_id' => null,
-            'registration_date' => Carbon::parse($userData['created_at'])->format('Y-m-d H:i:s'),
+            'registration_date' => $userData['created_at'],
             'verification_status' => $userData['email_verified_at'] ? 'verified' : 'not_verified',
             'email_status' => $userData['activated'] ? 'active' : 'inactive',
             'username' => $userData['name'] ?? null,

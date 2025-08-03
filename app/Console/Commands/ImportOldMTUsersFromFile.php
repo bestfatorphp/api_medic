@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
-use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -22,7 +21,7 @@ class ImportOldMTUsersFromFile extends Command
     protected $signature = 'import:old-mt-users
                           {--chunk=500 : Количество записей за одну транзакцию}';
 
-    protected $description = 'Импорт пользователей старого сайта МедТач, с обработкой 1M+ записей в ограниченной памяти';
+    protected $description = 'Импорт пользователей старого сайта МедТач из файла, с обработкой 1M+ записей в ограниченной памяти';
 
     /**
      * Путь к CSV файлу относительно директории storage/app
@@ -74,8 +73,7 @@ class ImportOldMTUsersFromFile extends Command
         }
 
         $stats = [
-            'users_mt' => ['created' => 0, 'updated' => 0],
-            'common_database' => ['created' => 0, 'updated' => 0],
+            'common_database' => 0,
             'skipped' => 0,
             'processed' => 0,
         ];
@@ -84,7 +82,6 @@ class ImportOldMTUsersFromFile extends Command
         $progressBar = $this->output->createProgressBar();
 
         //буферы для накопления данных перед пакетной вставкой
-        $usersMtBatch = [];
         $commonDbBatch = [];
 
         //наш чанк
@@ -132,24 +129,20 @@ class ImportOldMTUsersFromFile extends Command
             }
 
             //подготавливаем данные для вставки
-            $usersMtData = $this->prepareUsersMtData($record);
-            $commonDbData = $this->prepareCommonDatabaseData($record);
-
-            $usersMtBatch[] = $usersMtData;
-            $commonDbBatch[] = $commonDbData;
+            $commonDbBatch[] = $this->prepareCommonDatabaseData($record);
 
 
             //обработка пакета при достижении лимита
             if ($stats['processed'] % $chunkSize === 0) {
-                $this->processBatch($usersMtBatch, $commonDbBatch, $stats);
+                $this->processBatch($commonDbBatch, $stats);
             }
 
             $progressBar->advance();
         }
 
         //обработка последнего неполного пакета
-        if (!empty($usersMtBatch) || !empty($commonDbBatch)) {
-            $this->processBatch($usersMtBatch, $commonDbBatch, $stats);
+        if (!empty($commonDbBatch)) {
+            $this->processBatch($commonDbBatch, $stats);
         }
 
         fclose($file);
@@ -161,25 +154,7 @@ class ImportOldMTUsersFromFile extends Command
         $this->info("Результат выполнения:");
         $this->info("- Обработано записей: {$stats['processed']}");
         $this->info("- Пропущено записей: {$stats['skipped']}");
-        $this->info("- users_mt: {$stats['users_mt']['created']} создано, {$stats['users_mt']['updated']} обновлено");
-        $this->info("- common_database: {$stats['common_database']['created']} создано, {$stats['common_database']['updated']} обновлено");
-    }
-
-    /**
-     * Подготовка данных для таблицы users_mt
-     * @param array $record         Строка данных из CSV
-     * @return array                Подготовленные данные для вставки
-     */
-    protected function prepareUsersMtData(array $record): array
-    {
-        return [
-            'email' => $record['email'],
-            'full_name' => $record['ФИО'] ?? null,
-            'phone' => $record['Телефон'] ?? null,
-            'specialty' => $record['Специальность'] ?? null,
-            'city' => $record['Город'] ?? null,
-            'registration_website' => $record['Источник'] ?? null,
-        ];
+        $this->info("- common_database: {$stats['common_database']} вставлено");
     }
 
     /**
@@ -201,95 +176,28 @@ class ImportOldMTUsersFromFile extends Command
 
     /**
      * Пакетная обработка данных
-     * @param array &$usersMtBatch          Ссылка на батч данных для users_mt
      * @param array &$commonDbBatch         Ссылка на батч данных для common_database
      * @param array &$stats                 Ссылка на статистику выполнения
      */
     protected function processBatch(
-        array &$usersMtBatch,
         array &$commonDbBatch,
         array &$stats
     ): void {
-        DB::transaction(function () use (&$usersMtBatch, &$commonDbBatch, &$stats) {
-            if (!empty($usersMtBatch)) {
-                //получаем все email из текущего пакета
-                $emails = array_column($usersMtBatch, 'email');
-
-                //получаем существующие записи users_mt
-                $existingUsers = UserMT::query()
-                    ->whereIn('email', $emails)
-                    ->get()
-                    ->keyBy('email');  //преобразуем в ассоциативный массив по email
-
-                //получаем существующие записи common_database
-                $existingCommon = CommonDatabase::query()
-                    ->whereIn('email', $emails)
-                    ->get()
-                    ->keyBy('email');
-
-                //обрабатываем users_mt
-                $newUsers = [];
-                foreach ($usersMtBatch as $user) {
-                    if (isset($existingUsers[$user['email']])) {
-                        //обновляем существующую запись
-                        $existingUser = $existingUsers[$user['email']];
-                        $updateData = [];
-
-                        foreach ($user as $key => $value) {
-                            if ($value !== null && is_null($existingUser->$key)) {
-                                $updateData[$key] = $value;
-                            }
-                        }
-
-                        if (!empty($updateData)) {
-                            UserMT::where('id', $existingUser->id)->update($updateData);
-                            $stats['users_mt']['updated']++;
-                        }
-                    } else {
-                        $newUsers[] = $user;
-                    }
-                }
-
+        DB::transaction(function () use (&$commonDbBatch, &$stats) {
+            if (!empty($commonDbBatch)) {
                 //вставляем новые записи
-                if (!empty($newUsers)) {
-                    $this->withTableLock('users_mt', function () use ($newUsers) {
-                        UserMT::upsert($newUsers, ['email']);
-                    });
-                    $stats['users_mt']['created'] += count($newUsers);
-                }
+                $this->withTableLock('common_database', function () use ($commonDbBatch) {
+                    CommonDatabase::upsertWithMutators($commonDbBatch, ['email'], [
+                        'email',
+                        'full_name',
+                        'city',
+                        'specialty',
+                        'phone',
+                        'registration_website',
+                    ]);
+                });
+                $stats['common_database'] += count($commonDbBatch);
 
-                //обрабатываем common_database
-                $newCommon = [];
-                foreach ($commonDbBatch as $common) {
-                    if (isset($existingCommon[$common['email']])) {
-                        //обновляем существующую запись
-                        $existingCommonRecord = $existingCommon[$common['email']];
-                        $updateData = [];
-
-                        foreach ($common as $key => $value) {
-                            if ($value !== null && is_null($existingCommonRecord->$key)) {
-                                $updateData[$key] = $value;
-                            }
-                        }
-
-                        if (!empty($updateData)) {
-                            CommonDatabase::where('id', $existingCommonRecord->id)->update($updateData);
-                            $stats['common_database']['updated']++;
-                        }
-                    } else {
-                        $newCommon[] = $common;
-                    }
-                }
-
-                //вставляем новые записи
-                if (!empty($newCommon)) {
-                    $this->withTableLock('common_database', function () use ($newCommon) {
-                        CommonDatabase::upsert($newCommon, ['email']);
-                    });
-                    $stats['common_database']['created'] += count($newCommon);
-                }
-
-                $usersMtBatch = [];
                 $commonDbBatch = [];
             }
         });

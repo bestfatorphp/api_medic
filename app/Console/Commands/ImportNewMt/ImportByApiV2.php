@@ -281,7 +281,7 @@ class ImportByApiV2 extends Common
     {
         if (!empty($usersMTBatch)) {
             $this->withTableLock('users_mt', function () use ($usersMTBatch) {
-                UserMT::query()->upsert(
+                UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
                     ['full_name', 'email', 'phone']
@@ -359,7 +359,7 @@ class ImportByApiV2 extends Common
     {
         if (!empty($commonDBBatch)) {
             $this->withTableLock('common_database', function () use ($commonDBBatch) {
-                CommonDatabase::query()->upsert(
+                CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
                     ['full_name', 'username', 'phone']

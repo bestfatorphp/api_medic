@@ -16,6 +16,17 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        //Запускаем команды:
+
+        //php artisan import:old-mt-users
+
+        //php artisan import:new-mt-users --updated_after=01.01.2024 --onlyUsers=1
+        //php artisan import:new-mt-users --updated_after=01.05.2025
+        //php artisan import:new-mt-touches --updated_after=01.05.2025
+
+        //
+
+
         $commonPath = 'logs/';
 
 //        $schedule->command('import:sendsay-stats --from=01.05.2025')

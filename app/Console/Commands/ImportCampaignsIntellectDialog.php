@@ -242,7 +242,7 @@ class ImportCampaignsIntellectDialog extends Command
         try {
             if (!empty($contactsBatch)) {
                 $this->withTableLock('whatsapp_contacts', function () use ($contactsBatch) {
-                    WhatsAppContact::upsert(
+                    WhatsAppContact::upsertWithMutators(
                         $contactsBatch,
                         ['phone'] //phone является уникальным ключом
                     );
@@ -251,7 +251,7 @@ class ImportCampaignsIntellectDialog extends Command
 
             if (!empty($participationBatch)) {
                 $this->withTableLock('whatsapp_participation', function () use ($participationBatch) {
-                    WhatsAppParticipation::insertOrIgnore($participationBatch);
+                    WhatsAppParticipation::insertOrIgnoreWithMutators($participationBatch);
                 });
             }
 

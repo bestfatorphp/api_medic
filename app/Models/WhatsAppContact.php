@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\MutatorsHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,18 +11,23 @@ use Illuminate\Database\Eloquent\Model;
  * Class WhatsAppContact
  * @package App\Models
  *
- * @property integer        $id
- * @property string         $phone                  Телефон
+ * @property integer                    $id
+ * @property string                     $phone                  Телефон
+ *
+ * @property CommonDatabase             $common_database
+ * @property WhatsAppParticipation      $whatsapp_participations
  */
 class WhatsAppContact extends Model
 {
-    use HasFactory;
+    use HasFactory, MutatorsHelper;
 
     protected $table = 'whatsapp_contacts';
 
     public $timestamps = false;
 
     protected $guarded = ['id'];
+
+    protected $fillable = ['phone'];
 
     protected $with = [
 //        'common_database',
@@ -44,5 +50,13 @@ class WhatsAppContact extends Model
     public function whatsapp_participations()
     {
         return $this->hasMany(WhatsAppParticipation::class, 'phone', 'phone');
+    }
+
+    /**
+     * Мутатор для phone
+     */
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
     }
 }

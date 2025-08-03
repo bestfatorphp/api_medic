@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\MutatorsHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Doctor extends Model
 {
-    use HasFactory;
+    use HasFactory, MutatorsHelper;
 
     protected $table = 'doctors';
 
@@ -41,6 +42,14 @@ class Doctor extends Model
     public function common_database()
     {
         return $this->hasOne(CommonDatabase::class, 'email', 'email');
+    }
+
+    /**
+     * Мутатор для phone
+     */
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
     }
 
 }

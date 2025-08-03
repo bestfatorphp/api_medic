@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\MutatorsHelper;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,13 +19,20 @@ use Illuminate\Database\Eloquent\Model;
  */
 class WhatsAppParticipation extends Model
 {
-    use HasFactory;
+    use HasFactory, MutatorsHelper;
 
     protected $table = 'whatsapp_participation';
 
     public $timestamps = false;
 
     protected $guarded = [];
+
+    protected $fillable = [
+        'id',
+        'campaign_id',
+        'phone',
+        'send_date'
+    ];
 
     protected $with = [
       'whatsapp_contact'
@@ -47,5 +55,13 @@ class WhatsAppParticipation extends Model
     public function whatsapp_campaign()
     {
         return $this->belongsTo(WhatsAppCampaign::class, 'campaign_id');
+    }
+
+    /**
+     * Мутатор для phone
+     */
+    public function setPhoneAttribute($value)
+    {
+        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
     }
 }
