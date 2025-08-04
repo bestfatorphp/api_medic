@@ -50,13 +50,24 @@ class ImportByApiV1 extends Common
         $updatedAfter = $this->option('updated_after');
         $this->pageSize = $this->option('pageSize');
         $onlyUsers = $this->option('onlyUsers');
+
         $queryParams = [
-            'updated_after' => $updatedAfter
-                ? Carbon::parse($updatedAfter)->startOfDay()->format('Y-m-d H:i:s.v')
-                : Carbon::now()->subDay()->startOfDay()->format('Y-m-d H:i:s.v'),
-            'order' => 'updated_at',
             'pageSize' => $this->pageSize,
         ];
+
+        if (!$onlyUsers) {
+            $queryParams = array_merge([
+                'updated_after' => $updatedAfter
+                    ? Carbon::parse($updatedAfter)->startOfDay()->format('Y-m-d H:i:s.v')
+                    : Carbon::now()->subDay()->startOfDay()->format('Y-m-d H:i:s.v'),
+                'order' => 'updated_at',
+            ], $queryParams);
+        } else {
+            $queryParams = array_merge([
+                "orderBy" => "asc",
+                'order' => 'id',
+            ], $queryParams);
+        }
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
@@ -105,6 +116,11 @@ class ImportByApiV1 extends Common
                 }
                 foreach ($data as $userData) {
                     $email = $userData['email'];
+
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $this->info("Пропущен пользователь с невалидным email: {$email}");
+                        continue;
+                    }
 
                     if (in_array($email, $EMAILS)) {
                         continue;
@@ -168,7 +184,7 @@ class ImportByApiV1 extends Common
                 UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
-                    ['new_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
+                    ['new_mt_id', 'old_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
                 );
             });
 
@@ -189,7 +205,7 @@ class ImportByApiV1 extends Common
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'mt_user_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
+                    ['full_name', 'mt_user_id', 'new_mt_id', 'old_mt_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
                 );
             });
         });

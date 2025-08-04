@@ -84,6 +84,16 @@ class UserMT extends Model
     }
 
     /**
+     * Мутатор для email
+     */
+    public function setEmailAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['email'] ?? null)) {
+            $this->attributes['email'] = $value;
+        }
+    }
+
+    /**
      * Мутатор для full_name
      */
     public function setFullNameAttribute($value)
@@ -145,6 +155,26 @@ class UserMT extends Model
                 $value,
                 $this->attributes['specialty'] ?? null
             );
+        }
+    }
+
+    /**
+     * Мутатор для new_mt_id
+     */
+    public function setNewMtIdAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['new_mt_id'] ?? null)) {
+            $this->attributes['new_mt_id'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для old_mt_id
+     */
+    public function setOldMtIdAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['old_mt_id'] ?? null)) {
+            $this->attributes['old_mt_id'] = $value;
         }
     }
 

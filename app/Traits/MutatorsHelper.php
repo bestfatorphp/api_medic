@@ -2,8 +2,33 @@
 
 namespace App\Traits;
 
+use Illuminate\Support\Facades\Log;
+
 trait MutatorsHelper
 {
+
+    /**
+     * UpdateOrCreate с обработкой мутаторов
+     * @param array $uniqueBy
+     * @param array|null $updateFields
+     * @return static|null
+     */
+    public static function updateOrCreateWithMutators(array $uniqueBy, ?array $updateFields = null): ?static
+    {
+        $processed = self::processDataWithMutators([$updateFields]);
+        try {
+            return static::updateOrCreate($uniqueBy, $processed[0]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error("Database error: " . $e->getMessage());
+            return null;
+        } catch (\PDOException $e) {
+            Log::error("PDO error: " . $e->getMessage());
+            return null;
+        } catch (\Exception $e) {
+            Log::error("General error: " . $e->getMessage());
+            return null;
+        }
+    }
     /**
      * Insert с обработкой мутаторов
      * @param array $data
@@ -102,6 +127,25 @@ trait MutatorsHelper
         }
 
         return strlen($newValue) > strlen($currentValue);
+    }
+
+    /**
+     * Поле будет обновлено, если содержит null значение
+     * @param mixed $newValue
+     * @param mixed $currentValue
+     * @return bool
+     */
+    protected function shouldUpdateFieldIfNotNull(mixed $newValue, mixed $currentValue): bool
+    {
+        if (empty($newValue)) {
+            return false;
+        }
+
+        if ($currentValue === null) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Helpers\DBHelper;
 use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
+use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -376,16 +378,41 @@ class ImportMTHeliosFile extends Command
                         }
 
                         $email = trim($matches[2]);
-                        $this->withTableLock('common_database', function () use ($email, $userBitrixId) {
-                            CommonDatabase::firstOrCreate(
+
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            $userBitrixId = null;
+                            Log::channel('commands')->warning("Пропущена некорректная строка с невалидным email: {$email}");
+                            continue;
+                        }
+
+                        $commonDb = $this->withTableLock('common_database', function () use ($email, $userBitrixId) {
+                            return CommonDatabase::updateOrCreateWithMutators(
                                 ['email' => $email],
                                 ['email' => $email, 'old_mt_id' => $userBitrixId]
                             );
                         });
+
+                        if (!$commonDb) {
+                            $issetCD = CommonDatabase::query()->where('old_mt_id', $userBitrixId)->select(['id', 'email'])->first();
+                            /** @var CommonDatabase $issetCD */
+                            if ($issetCD) {
+                                $this->warn("Попытка создания записи {$email} в common_database с old_mt_id {$userBitrixId}, который уже принадлежит записи с ID {$issetCD->id} и email {$issetCD->email}");
+                            }
+                        }
+
+                        if ($commonDb && $commonDb->old_mt_id != (int)$userBitrixId) {
+                            $this->warn("В строке нет равенста id-ков: {$commonDb->old_mt_id} (для email {$commonDb->email}) != {$userBitrixId} (для email {$email})");
+                            $userBitrixId = $commonDb->old_mt_id; //переопределяю id
+                        }
                     } else {
                         Log::warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
                     }
+                    continue;
+                }
+
+                if (empty($userBitrixId)) {
+                    $this->warn("Пропущена некорректная строка с пустым пользователем: " . $row[0]);
                     continue;
                 }
 

@@ -39,18 +39,18 @@ class UpdateActionsMtTable extends Migration
      */
     public function down()
     {
-        Schema::table('actions_mt', function (Blueprint $table) {
-            $table->dropUnique('actions_mt_unique_action');
-            $table->dropColumn('old_mt_id');
-
-            $table->unsignedInteger('mt_user_id')
-                ->comment('ID пользователя МТ')
-                ->change();
-
-            $table->unique(
-                ['mt_user_id', 'activity_id', 'date_time'],
-                'actions_mt_unique_action'
-            );
-        });
+//        Schema::table('actions_mt', function (Blueprint $table) {
+//            $table->dropUnique('actions_mt_unique_action');
+//            $table->dropColumn('old_mt_id');
+//
+//            $table->unsignedInteger('mt_user_id')
+//                ->comment('ID пользователя МТ')
+//                ->change();
+//
+//            $table->unique(
+//                ['mt_user_id', 'activity_id', 'date_time'],
+//                'actions_mt_unique_action'
+//            );
+//        });
     }
 }
