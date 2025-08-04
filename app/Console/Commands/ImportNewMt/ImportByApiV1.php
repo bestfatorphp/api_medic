@@ -106,10 +106,6 @@ class ImportByApiV1 extends Common
                 foreach ($data as $userData) {
                     $email = $userData['email'];
 
-                    if ($email === 'marinarm13@gmail.com' || $email === 'bh.hannah@yandex.ru') {
-                        Log::info('Дубль: ', $userData);
-                    }
-
                     if (in_array($email, $EMAILS)) {
                         continue;
                     }
