@@ -40,10 +40,10 @@ class Kernel extends ConsoleKernel
 //            ->timezone('Europe/Moscow')
 //            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->yearlyOn(now()->month, now()->day, '23:00')
-            ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
+//        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+//            ->yearlyOn(now()->month, now()->day, '23:00')
+//            ->timezone('Europe/Moscow')
+//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
@@ -55,20 +55,19 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:20')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
+        $schedule->command('import:id-campaigns')
+            ->dailyAt('00:30')
+            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
+
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-//            ->dailyAt('00:30')
+//            ->dailyAt('00:50')
 //            ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
 //        $schedule->command('import:sendsay-stats')
-//            ->dailyAt('01:00')
+//            ->dailyAt('02:30')
 //            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
 
-
-        /*
-        $schedule->command('import:id-campaigns')
-            ->dailyAt('00:40')
-            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));*/
 
 
 //        $schedule->command('import:us-campaigns')
