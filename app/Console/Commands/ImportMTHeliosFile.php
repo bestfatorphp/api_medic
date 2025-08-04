@@ -372,7 +372,7 @@ class ImportMTHeliosFile extends Command
                     if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
                         $userBitrixId = $matches[1];
 
-                        if (empty($userBitrixId)) {
+                        if (empty($userBitrixId) || empty($userBitrixId = trim($userBitrixId))) {
                             $this->warn("Пропущена некорректная строка с пустым ID пользователя: " . $row[0]);
                             continue;
                         }
@@ -392,17 +392,16 @@ class ImportMTHeliosFile extends Command
                             );
                         });
 
-                        if (!$commonDb) {
-                            $issetCD = CommonDatabase::query()->where('old_mt_id', $userBitrixId)->select(['id', 'email'])->first();
-                            /** @var CommonDatabase $issetCD */
-                            if ($issetCD) {
-                                $this->warn("Попытка создания записи {$email} в common_database с old_mt_id {$userBitrixId}, который уже принадлежит записи с ID {$issetCD->id} и email {$issetCD->email}");
+                        if ($userBitrixId) {
+                            if (!$commonDb) {
+                                $commonDb = CommonDatabase::query()->where('old_mt_id', $userBitrixId)->select(['id', 'email'])->first();
                             }
-                        }
 
-                        if ($commonDb && $commonDb->old_mt_id != (int)$userBitrixId) {
-                            $this->warn("В строке нет равенста id-ков: {$commonDb->old_mt_id} (для email {$commonDb->email}) != {$userBitrixId} (для email {$email})");
-                            $userBitrixId = $commonDb->old_mt_id; //переопределяю id
+                            /** @var CommonDatabase $commonDb */
+                            if ($commonDb && $commonDb->old_mt_id != (int)$userBitrixId) {
+                                $this->warn("В строке нет равенста id-ков: {$commonDb->old_mt_id} (для email {$commonDb->email}) != {$userBitrixId} (для email {$email})");
+                                $userBitrixId = $commonDb->old_mt_id; //переопределяю id
+                            }
                         }
                     } else {
                         Log::warning("Некорректная строка с пользователем: " . json_encode($row));

@@ -40,10 +40,10 @@ class Kernel extends ConsoleKernel
 //            ->timezone('Europe/Moscow')
 //            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-//        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-//            ->yearlyOn(now()->month, now()->day, '15:35')
-//            ->timezone('Europe/Moscow')
-//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
+        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+            ->yearlyOn(now()->month, now()->day, '23:00')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
