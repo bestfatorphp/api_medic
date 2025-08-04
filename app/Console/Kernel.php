@@ -35,8 +35,8 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
-        $schedule->command('php artisan import:new-mt-users --onlyUsers=1')
-            ->yearlyOn(now()->month, now()->day, '21:00')
+        $schedule->command('import:new-mt-users --onlyUsers=1')
+            ->yearlyOn(now()->month, now()->day, '21:10')
             ->timezone('Europe/Moscow')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users-cn.log"));
 
@@ -46,10 +46,15 @@ class Kernel extends ConsoleKernel
 //            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
+
 //        $schedule->command('import:sendsay-stats')
 //            ->dailyAt('00:10')
 //            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
-//
+
+//        $schedule->command('php artisan import:new-mt-users')
+//            ->dailyAt('00:10')
+//            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
+
 //        $schedule->command('import:new-mt-touches')
 //            ->dailyAt('00:20')
 //            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
@@ -58,17 +63,13 @@ class Kernel extends ConsoleKernel
 //            ->dailyAt('00:30')
 //            ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
+
+
         /*
         $schedule->command('import:id-campaigns')
             ->dailyAt('00:40')
             ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));*/
 
-
-        /*$schedule->command('import:new-mt-users')
-            ->dailyAt('01:00')
-            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
-
-        */
 
 //        $schedule->command('import:us-campaigns')
 //            ->dailyAt('01:20')
