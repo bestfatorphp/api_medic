@@ -35,6 +35,11 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
+        $schedule->command('php artisan import:new-mt-users --onlyUsers=1')
+            ->yearlyOn(now()->month, now()->day, '21:00')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users-cn.log"));
+
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->yearlyOn(now()->month, now()->day, '15:35')
 //            ->timezone('Europe/Moscow')
