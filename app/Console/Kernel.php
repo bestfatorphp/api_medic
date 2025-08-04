@@ -30,15 +30,15 @@ class Kernel extends ConsoleKernel
 
         //php artisan import:new-mt-touches --updated_after=01.05.2025 (отработала)
 
-        //php artisan import:medtouch-helios --chunk=5 --timeout=120 --need-file=true
+        //php artisan import:medtouch-helios --chunk=5 --timeout=120 --need-file=true (отработала)
 
 
         $commonPath = 'logs/';
 
-//        $schedule->command('import:sendsay-stats --from=01.05.2025')
-//            ->yearlyOn(now()->month, now()->day, '01:00')
-//            ->timezone('Europe/Moscow')
-//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
+        $schedule->command('import:sendsay-stats --from=01.05.2025')
+            ->yearlyOn(now()->month, now()->day, '00:34')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->yearlyOn(now()->month, now()->day, '23:00')
@@ -70,6 +70,7 @@ class Kernel extends ConsoleKernel
 
 
 
+        //разовая команда (после оплаты аккаунта собрать)
 //        $schedule->command('import:us-campaigns')
 //            ->dailyAt('01:20')
 //            ->sendOutputTo(storage_path("{$commonPath}import-us-campaigns.log"));
