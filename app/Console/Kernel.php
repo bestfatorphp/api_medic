@@ -18,8 +18,6 @@ class Kernel extends ConsoleKernel
     {
         //Запускаем команды:
 
-        //php artisan import:sendsay-stats --from=01.05.2025
-
         //php artisan import:users-chats - разовая команда (отработала)
 
         //php artisan import:old-mt-users - разовая команда (отработала)
@@ -27,23 +25,21 @@ class Kernel extends ConsoleKernel
         //php artisan import:new-mt-users --onlyUsers=1 (отработала)
         //php artisan import:new-mt-users --updated_after=01.01.2025 (отработала)
 
-
         //php artisan import:new-mt-touches --updated_after=01.05.2025 (отработала)
 
         //php artisan import:medtouch-helios --chunk=5 --timeout=120 --need-file=true (отработала)
 
+        //php artisan import:id-campaigns (отработала)
+
+        //php artisan import:sendsay-stats --from=01.05.2025 (отработала)
+
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:sendsay-stats --from=01.05.2025')
-            ->yearlyOn(now()->month, now()->day, '00:34')
-            ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
-
-//        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-//            ->yearlyOn(now()->month, now()->day, '23:00')
+//        $schedule->command('import:sendsay-stats --from=01.05.2025')
+//            ->yearlyOn(now()->month, now()->day, '00:34')
 //            ->timezone('Europe/Moscow')
-//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
+//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
@@ -59,13 +55,13 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
 
-//        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-//            ->dailyAt('00:50')
-//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
+        $schedule->command('import:sendsay-stats')
+            ->dailyAt('00:40')
+            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-//        $schedule->command('import:sendsay-stats')
-//            ->dailyAt('02:30')
-//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
+        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+            ->dailyAt('01:30')
+            ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
 
 
