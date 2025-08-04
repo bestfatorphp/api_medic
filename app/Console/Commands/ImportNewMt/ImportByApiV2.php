@@ -362,7 +362,7 @@ class ImportByApiV2 extends Common
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'username', 'phone']
+                    ['full_name', 'email', 'phone']
                 );
             });
         }

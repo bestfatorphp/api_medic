@@ -18,15 +18,17 @@ class Kernel extends ConsoleKernel
     {
         //Запускаем команды:
 
-        //php artisan import:users-chats
+        //php artisan import:users-chats - разовая команда (отработала)
 
-        //php artisan import:old-mt-users
+        //php artisan import:old-mt-users - разовая команда (отработала)
 
-        //php artisan import:new-mt-users --updated_after=01.01.2024 --onlyUsers=1
-        //php artisan import:new-mt-users --updated_after=01.05.2025
+        //php artisan import:new-mt-users --updated_after=01.01.2024 --onlyUsers=1 (пока откладывется, возможно проблема с апи)
+        //php artisan import:new-mt-users --updated_after=01.01.2025 (пока откладывется, возможно проблема с апи)
+
+
         //php artisan import:new-mt-touches --updated_after=01.05.2025
 
-        //
+        //php artisan import:new-mt-touches --updated_after=01.05.2025
 
 
         $commonPath = 'logs/';

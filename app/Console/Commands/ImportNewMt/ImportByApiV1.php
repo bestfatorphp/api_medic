@@ -8,6 +8,7 @@ use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
 use App\Models\UserMT;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +105,10 @@ class ImportByApiV1 extends Common
                 }
                 foreach ($data as $userData) {
                     $email = $userData['email'];
+
+                    if ($email === 'marinarm13@gmail.com' || $email === 'bh.hannah@yandex.ru') {
+                        Log::info('Дубль: ', $userData);
+                    }
 
                     if (in_array($email, $EMAILS)) {
                         continue;
@@ -456,6 +461,7 @@ class ImportByApiV1 extends Common
                         $activityData = [
                             'type' => 'Квиз',
                             'name' => $quizData['name'],
+                            'date_time' => $quizData['created_at'] ? Carbon::parse($quizData['created_at'])->format('Y-m-d H:i:s') : null
                         ];
                         return ActivityMT::firstOrCreate(
                             $activityData,

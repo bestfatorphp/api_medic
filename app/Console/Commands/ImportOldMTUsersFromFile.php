@@ -21,7 +21,7 @@ class ImportOldMTUsersFromFile extends Command
     protected $signature = 'import:old-mt-users
                           {--chunk=500 : Количество записей за одну транзакцию}';
 
-    protected $description = 'Импорт пользователей старого сайта МедТач из файла, с обработкой 1M+ записей в ограниченной памяти';
+    protected $description = 'Импорт пользователей старого сайта МедТач из файла, с обработкой 1M+ записей в ограниченной памяти (разовая команда)';
 
     /**
      * Путь к CSV файлу относительно директории storage/app
