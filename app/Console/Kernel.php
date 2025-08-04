@@ -22,7 +22,7 @@ class Kernel extends ConsoleKernel
 
         //php artisan import:users-chats - разовая команда (отработала)
 
-        //php artisan import:old-mt-users - разовая команда
+        //php artisan import:old-mt-users - разовая команда (отработала)
 
         //php artisan import:new-mt-users --onlyUsers=1 (отработала)
         //php artisan import:new-mt-users --updated_after=01.01.2025 (отработала)
@@ -35,10 +35,10 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:old-mt-users')
-            ->yearlyOn(now()->month, now()->day, '21:42')
+        $schedule->command('import:new-mt-touches --updated_after=01.05.2025')
+            ->yearlyOn(now()->month, now()->day, '21:45')
             ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-old-users.log"));
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->yearlyOn(now()->month, now()->day, '15:35')
