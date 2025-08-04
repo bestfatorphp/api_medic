@@ -18,6 +18,8 @@ class Kernel extends ConsoleKernel
     {
         //Запускаем команды:
 
+        //php artisan import:users-chats
+
         //php artisan import:old-mt-users
 
         //php artisan import:new-mt-users --updated_after=01.01.2024 --onlyUsers=1

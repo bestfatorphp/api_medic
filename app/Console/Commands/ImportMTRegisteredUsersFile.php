@@ -17,7 +17,7 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
 use Symfony\Component\Panther\Client;
 
 //todo: Перед использованием, установки на сервере для Panther
-class ImportMTHeliosFile extends Command
+class ImportMTRegisteredUsersFile extends Command
 {
     use WriteLockTrait;
 
@@ -25,7 +25,7 @@ class ImportMTHeliosFile extends Command
      * Пример: php artisan import:medtouch-helios --chunk=5 --timeout=60
      * @var string
      */
-    protected $signature = 'import:medtouch-helios
+    protected $signature = 'import:medtouch-reg-users
                             {--chunk=5 : Размер чанка скачивания в MB}
                             {--timeout=120 : Таймаут ожидания в секундах}
                             {--need-file=false : Сохранять ли CSV файл}';
@@ -34,7 +34,7 @@ class ImportMTHeliosFile extends Command
      * Описание команды.
      * @var string
      */
-    protected $description = 'Скачиваем большой файл CSV (Мед-тач) из Bitrix24 в приватное хранилище, действия пользователей и импортируем в БД';
+    protected $description = 'Скачиваем большой файл CSV (Мед-тач) из Bitrix24 в приватное хранилище, пользователей и импортируем в БД';
 
     /**
      * Безопасный буфер памяти (в байтах), оставляемый свободным при работе с большими файлами.
@@ -53,7 +53,7 @@ class ImportMTHeliosFile extends Command
     /**
      * Имя csv файла для сохранения экспортированных данных.
      */
-    private const TARGET_FILENAME = 'user-helios.csv';
+    private const TARGET_FILENAME = 'registered-users.csv';
 
     /**
      * Путь для хранения экспортированных файлов относительно корня storage.
@@ -194,9 +194,9 @@ class ImportMTHeliosFile extends Command
      */
     private function getTargetUrl(): string
     {
-        $url = env('BITRIX_MEDTOUCH_SCRIPT_URL');
+        $url = env('BITRIX_MEDTOUCH_SCRIPT_URL_2');
         if (empty($url)) {
-            throw new \Exception("BITRIX_MEDTOUCH_SCRIPT_URL не указан в .env");
+            throw new \Exception("BITRIX_MEDTOUCH_SCRIPT_URL_2 не указан в .env");
         }
         return $url;
     }
@@ -295,11 +295,11 @@ class ImportMTHeliosFile extends Command
             $timestamp = time();
 
             //скриншот
-            $screenshot = self::SCREENSHOT_PATH . "error_{$timestamp}.png";
+            $screenshot = self::SCREENSHOT_PATH . "error_ru_{$timestamp}.png";
             $client->takeScreenshot(storage_path('app/' . $screenshot));
 
             //html
-            $html = self::HTML_DUMP_PATH . "page_{$timestamp}.html";
+            $html = self::HTML_DUMP_PATH . "page_ru_{$timestamp}.html";
             Storage::put($html, $client->getCrawler()->html());
 
             $this->error("Отладочная информация сохранена:");
@@ -366,116 +366,36 @@ class ImportMTHeliosFile extends Command
 
         try {
             while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
+                dd($row);
                 //проверяем строку с данными пользователя
-                if (strpos($row[0], 'ID пользователя') === 0) {
-                    if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
-                        $userBitrixId = $matches[1];
-                        $email = trim($matches[2]);
-                        $currentUser = $this->withTableLock('users_mt', function () use ($email) {
-                            return UserMT::firstOrCreate(
-                                ['email' => $email],
-                                ['email' => $email]
-                            );
-                        });
-                        $this->withTableLock('common_database', function () use ($email, $currentUser) {
-                            CommonDatabase::updateOrCreate(
-                                ['email' => $email],
-                                ['email' => $email, 'mt_user_id' => $currentUser->id]
-                            );
-                        });
-                    } else {
-                        Log::warning("Некорректная строка с пользователем: " . json_encode($row));
-                        $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
-                    }
-                    continue;
-                }
-
-                //пропускаем строки без пользователя
-                if (!$currentUser) {
-                    $this->warn("Пропущена строка без текущего пользователя: " . implode("; ", $row));
-                    continue;
-                }
-
-                if (empty($row[0])) {
-                    continue; //пустая строка
-                }
-
-                //проверяем допустимый тип активности
-                $activityType = $row[0];
-                if (!in_array($activityType, $validActivityTypes)) {
-                    $this->warn("Пропущена строка с неизвестным типом активности: {$activityType}");
-                    continue;
-                }
-
-                $dateTime = $this->parseDateTime($row[2] ?? '');
-
-                //парсим активность
-                $activityData = [
-                    'type' => $activityType,
-                    'name' => $row[1] ?? '',
-                    'date_time' => $dateTime,
-                ];
-
-                /** @var ActivityMT $activity */
-                $activity = $this->withTableLock('activities_mt', function () use ($activityData) {
-                    return ActivityMT::firstOrCreate(
-                        [
-                            'type' => $activityData['type'],
-                            'name' => $activityData['name']
-                        ],
-                        $activityData
-                    );
-                });
-
-                //парсим duration (продолжительность)
-                $durationInSeconds = floatval(str_replace(',', '.', str_replace('не передаются данные по продолжительности', '0', $row[3] ?? '')));
-                $durationInMinutes = round($durationInSeconds / 60, 2); //преобразуем в минуты с округлением до 2-х знаков
-
-                //парсим результат
-                $result = 0;
-                if ($activityType !== 'Квиз') {
-                    $result = floatval(str_replace(',', '.', str_replace(['%', 'Просмотрено ', 'процентов'], '', $row[4] ?? '')));
-                }
-
-                $actionsToInsert[] = [
-                    'mt_user_id' => $currentUser->id,
-                    'activity_id' => $activity->id,
-                    'date_time' => $activity->date_time,
-                    'duration' => $durationInMinutes,
-                    'result' => $result,
-                ];
-
-                if (count($actionsToInsert) >= $batchSize) {
-                    ++$countBatchInsert;
-                    $this->info("Пакетная вставка - $countBatchInsert");
-                    $this->insertActions($actionsToInsert);
-                    $actionsToInsert = [];
-                    gc_mem_caches(); //очищаем кэши памяти Zend Engine
-
-                }
-            }
-
-            //вставляем оставшиеся записи
-            if (!empty($actionsToInsert)) {
-                ++$countBatchInsert;
-                $this->info("Пакетная вставка - $countBatchInsert");
-                $this->insertActions($actionsToInsert);
+//                if (strpos($row[0], 'ID пользователя') === 0) {
+//                    if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
+//                        $userBitrixId = $matches[1];
+//                        $email = trim($matches[2]);
+//                        $currentUser = $this->withTableLock('users_mt', function () use ($email) {
+//                            return UserMT::firstOrCreate(
+//                                ['email' => $email],
+//                                ['email' => $email]
+//                            );
+//                        });
+//                        $this->withTableLock('common_database', function () use ($email, $currentUser) {
+//                            CommonDatabase::updateOrCreate(
+//                                ['email' => $email],
+//                                ['email' => $email, 'mt_user_id' => $currentUser->id]
+//                            );
+//                        });
+//                    } else {
+//                        Log::warning("Некорректная строка с пользователем: " . json_encode($row));
+//                        $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
+//                    }
+//                    continue;
+//                }
             }
         } finally {
             fclose($handle);
         }
 
         $this->info("Обработка CSV завершена.");
-    }
-
-    /**
-     * @param array $actionsToInsert
-     */
-    private function insertActions(array $actionsToInsert)
-    {
-        $this->withTableLock('actions_mt', function () use ($actionsToInsert) {
-            ActionMT::insertOrIgnore($actionsToInsert);
-        });
     }
 
     /**

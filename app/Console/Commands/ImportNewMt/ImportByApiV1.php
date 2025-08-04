@@ -167,7 +167,7 @@ class ImportByApiV1 extends Common
                 UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
-                    ['new_mt_id', 'full_name', 'email', 'registration_date', 'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
+                    ['new_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
                 );
             });
 
@@ -188,7 +188,7 @@ class ImportByApiV1 extends Common
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'mt_user_id', 'registration_date', 'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
+                    ['full_name', 'mt_user_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
                 );
             });
         });
@@ -204,6 +204,7 @@ class ImportByApiV1 extends Common
     {
         return [
             'new_mt_id' => $userData['id'],
+            'old_mt_id' => $userData['medtouch_id'],
             'full_name' => $fullName,
             'email' => $userData['email'],
             'registration_date' => $userData['created_at'],
@@ -226,6 +227,7 @@ class ImportByApiV1 extends Common
     {
         return [
             'new_mt_id' => $userData['id'],
+            'old_mt_id' => $userData['medtouch_id'],
             'full_name' => $fullName,
             'email' => $userData['email'],
             'mt_user_id' => null,
