@@ -26,17 +26,15 @@ class Kernel extends ConsoleKernel
         //php artisan import:new-mt-users --updated_after=01.01.2025 (пока откладывется, возможно проблема с апи)
 
 
-        //php artisan import:new-mt-touches --updated_after=01.05.2025
-
-        //php artisan import:new-mt-touches --updated_after=01.05.2025
+        //php artisan import:new-mt-touches --updated_after=01.05.2025 (отработала)
 
 
         $commonPath = 'logs/';
 
-//        $schedule->command('import:sendsay-stats --from=01.05.2025')
-//            ->yearlyOn(now()->month, now()->day, '02:00')
-//            ->timezone('Europe/Moscow')
-//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay-cn.log"));
+        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+            ->yearlyOn(now()->month, now()->day, '15:10')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
 
         $schedule->command('import:sendsay-stats')
             ->dailyAt('00:10')
@@ -51,19 +49,10 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:10')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
-        $schedule->command('import:telegram-users')
-            ->dailyAt('00:20')
-            ->sendOutputTo(storage_path("{$commonPath}import-telegram-users.log"));
-
-
         $schedule->command('import:id-campaigns')
             ->dailyAt('00:40')
             ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));*/
 
-        //Перенесли из файла, лучше запускать руками, если файл будет изменён!!!
-//        $schedule->command('import:old-mt-users')
-//            ->dailyAt('00:50')
-//            ->sendOutputTo(storage_path("{$commonPath}import-old-mt-users.log"));
 
         /*$schedule->command('import:new-mt-users')
             ->dailyAt('01:00')

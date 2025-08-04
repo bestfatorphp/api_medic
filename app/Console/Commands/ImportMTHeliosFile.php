@@ -6,7 +6,6 @@ use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
-use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -358,7 +357,7 @@ class ImportMTHeliosFile extends Command
             throw new \Exception("Не удалось открыть CSV файл");
         }
 
-        $currentUser = null;
+        $userBitrixId = null;
         $batchSize = 1000;
         $validActivityTypes = ['Лонгрид', 'Мероприятие', 'Видеовизит', 'Квиз'];
         $actionsToInsert = [];
@@ -367,32 +366,26 @@ class ImportMTHeliosFile extends Command
         try {
             while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
                 //проверяем строку с данными пользователя
-                if (strpos($row[0], 'ID пользователя') === 0) {
+                if (strpos($row[0], 'ID пользователя: ') === 0) {
                     if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
                         $userBitrixId = $matches[1];
+
+                        if (empty($userBitrixId)) {
+                            $this->warn("Пропущена некорректная строка с пустым ID пользователя: " . $row[0]);
+                            continue;
+                        }
+
                         $email = trim($matches[2]);
-                        $currentUser = $this->withTableLock('users_mt', function () use ($email) {
-                            return UserMT::firstOrCreate(
-                                ['email' => $email],
-                                ['email' => $email]
-                            );
-                        });
-                        $this->withTableLock('common_database', function () use ($email, $currentUser) {
+                        $this->withTableLock('common_database', function () use ($email, $userBitrixId) {
                             CommonDatabase::updateOrCreate(
                                 ['email' => $email],
-                                ['email' => $email, 'mt_user_id' => $currentUser->id]
+                                ['email' => $email, 'old_mt_id' => $userBitrixId]
                             );
                         });
                     } else {
                         Log::warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
                     }
-                    continue;
-                }
-
-                //пропускаем строки без пользователя
-                if (!$currentUser) {
-                    $this->warn("Пропущена строка без текущего пользователя: " . implode("; ", $row));
                     continue;
                 }
 
@@ -438,7 +431,7 @@ class ImportMTHeliosFile extends Command
                 }
 
                 $actionsToInsert[] = [
-                    'mt_user_id' => $currentUser->id,
+                    'old_mt_id' => $userBitrixId,
                     'activity_id' => $activity->id,
                     'date_time' => $activity->date_time,
                     'duration' => $durationInMinutes,
@@ -451,7 +444,6 @@ class ImportMTHeliosFile extends Command
                     $this->insertActions($actionsToInsert);
                     $actionsToInsert = [];
                     gc_mem_caches(); //очищаем кэши памяти Zend Engine
-
                 }
             }
 

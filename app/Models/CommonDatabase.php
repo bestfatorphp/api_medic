@@ -47,6 +47,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property UserChat               $user_chats
  * @property WhatsAppContact        $whatsapp_contact
  * @property ActionMT               $actions_mt
+ * @property ActionMT               $actions_mt_helios
  */
 class CommonDatabase extends Model
 {
@@ -131,6 +132,15 @@ class CommonDatabase extends Model
     public function actions_mt(): HasMany
     {
         return $this->hasMany(ActionMT::class, 'mt_user_id', 'mt_user_id');
+    }
+
+    /**
+     * Действия МТ Helios
+     * @return HasMany
+     */
+    public function actions_mt_helios(): HasMany
+    {
+        return $this->hasMany(ActionMT::class, 'old_mt_id', 'old_mt_id');
     }
 
     /**

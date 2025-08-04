@@ -24,9 +24,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
 //    return CommonDatabase::with(['user_mt', 'doctor', 'parsing_pd', 'unisender_contact', 'actions_mt'])->limit(2)->get()->toArray();
 //    return WhatsAppCampaign::with(['whatsapp_participations'])->limit(1)->get()->toArray();
-    return ActivityMT::whereHas('actions_mt', function ($q) {
-        $q->where('mt_user_id', 2);
-    })->with(['actions_mt' => function ($q) {
-        $q->where('mt_user_id', 2);
-    }])->limit(10)->get()->toArray();
+    return CommonDatabase::whereHas('actions_mt_helios', function ($q) {
+        $q->where('old_mt_id', 1);
+    })->with(['actions_mt_helios'])->limit(1)->get()->toArray();
 });
