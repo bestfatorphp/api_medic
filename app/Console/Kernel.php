@@ -28,11 +28,13 @@ class Kernel extends ConsoleKernel
 
         //php artisan import:new-mt-touches --updated_after=01.05.2025 (отработала)
 
+        //php artisan import:medtouch-helios --chunk=5 --timeout=120 --need-file=true (отработала)
+
 
         $commonPath = 'logs/';
 
         $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->yearlyOn(now()->month, now()->day, '15:10')
+            ->yearlyOn(now()->month, now()->day, '15:35')
             ->timezone('Europe/Moscow')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch-cn.log"));
 
@@ -44,11 +46,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:20')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
-        //Суточные комманды (сбор статистики и данных за предыдущие сутки)
-        /*$schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->dailyAt('00:10')
+        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+            ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
 
+        //Суточные комманды (сбор статистики и данных за предыдущие сутки)
+        /*
         $schedule->command('import:id-campaigns')
             ->dailyAt('00:40')
             ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));*/

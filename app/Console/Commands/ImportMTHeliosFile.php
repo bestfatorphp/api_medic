@@ -377,7 +377,7 @@ class ImportMTHeliosFile extends Command
 
                         $email = trim($matches[2]);
                         $this->withTableLock('common_database', function () use ($email, $userBitrixId) {
-                            CommonDatabase::updateOrCreate(
+                            CommonDatabase::firstOrCreate(
                                 ['email' => $email],
                                 ['email' => $email, 'old_mt_id' => $userBitrixId]
                             );
