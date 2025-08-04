@@ -28,17 +28,17 @@ class Kernel extends ConsoleKernel
         //php artisan import:new-mt-users --updated_after=01.01.2025 (отработала)
 
 
-        //php artisan import:new-mt-touches --updated_after=01.05.2025
+        //php artisan import:new-mt-touches --updated_after=01.05.2025 (отработала)
 
         //php artisan import:medtouch-helios --chunk=5 --timeout=120 --need-file=true
 
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:new-mt-touches --updated_after=01.05.2025')
-            ->yearlyOn(now()->month, now()->day, '21:45')
-            ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
+//        $schedule->command('import:sendsay-stats --from=01.05.2025')
+//            ->yearlyOn(now()->month, now()->day, '01:00')
+//            ->timezone('Europe/Moscow')
+//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->yearlyOn(now()->month, now()->day, '15:35')
@@ -51,9 +51,9 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:10')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
-//        $schedule->command('import:new-mt-touches')
-//            ->dailyAt('00:20')
-//            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
+        $schedule->command('import:new-mt-touches')
+            ->dailyAt('00:20')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
 //        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->dailyAt('00:30')
