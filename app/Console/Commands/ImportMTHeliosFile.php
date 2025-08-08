@@ -2,12 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Helpers\DBHelper;
 use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
-use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -360,6 +358,7 @@ class ImportMTHeliosFile extends Command
         }
 
         $userBitrixId = null;
+        $email = null;
         $batchSize = 1000;
         $validActivityTypes = ['Лонгрид', 'Мероприятие', 'Видеовизит', 'Квиз'];
         $actionsToInsert = [];
@@ -433,6 +432,7 @@ class ImportMTHeliosFile extends Command
                     'type' => $activityType,
                     'name' => $row[1] ?? '',
                     'date_time' => $dateTime,
+                    'is_online' => true
                 ];
 
                 /** @var ActivityMT $activity */
@@ -457,6 +457,7 @@ class ImportMTHeliosFile extends Command
                 }
 
                 $actionsToInsert[] = [
+                    'email' => $email,
                     'old_mt_id' => $userBitrixId,
                     'activity_id' => $activity->id,
                     'date_time' => $activity->date_time,

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @package App\Models
  *
  * @property integer        $id
+ * @property string         $email              E-mail
  * @property integer        $mt_user_id         ID пользователя МТ
  * @property integer        $activity_id        ID активности МТ
  * @property Carbon         $date_time          Дата и время действия

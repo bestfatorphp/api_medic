@@ -35,7 +35,8 @@ class CreateMedicTables extends Migration
         //Пользователи MT
         Schema::create('users_mt', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('new_mt_id')->unique()->nullable()->comment('ID пользователя нового МТ');
+            $table->unsignedInteger('new_mt_id')->nullable()->unique()->comment('ID пользователя нового МТ');
+            $table->unsignedInteger('old_mt_id')->nullable()->unique()->comment('ID пользователя старого МТ');
             $table->string('full_name')->nullable()->comment('ФИО');
             $table->string('email')->unique()->comment('E-mail');
             $table->string('gender')->nullable()->comment('Пол');
@@ -72,15 +73,17 @@ class CreateMedicTables extends Migration
         //Действия МТ
         Schema::create('actions_mt', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('mt_user_id')->comment('ID пользователя МТ');
+            $table->string('email')->comment('E-mail');
+            $table->unsignedInteger('mt_user_id')->default(0)->comment('ID пользователя МТ');
+            $table->unsignedInteger('old_mt_id')->default(0)->comment('ID пользователя старого МТ');
             $table->unsignedInteger('activity_id')->comment('ID активности МТ');
             $table->dateTime('date_time')->nullable()->comment('Дата и время');
-            $table->float('duration')->nullable()->comment('Продолжительность');
-            $table->float('result')->nullable()->comment('Результат');
+            $table->float('duration')->default(0)->comment('Продолжительность');
+            $table->float('result')->default(0)->comment('Результат');
 
             $table->index('mt_user_id');
             //уникальный индекс для предотвращения дублирования при пакетной вставке
-            $table->unique(['mt_user_id', 'activity_id', 'date_time'], 'actions_mt_unique_action');
+            $table->unique(['mt_user_id', 'old_mt_id', 'activity_id', 'date_time'], 'actions_mt_unique_action');
         });
 
         //Проекты нового МТ
@@ -219,6 +222,8 @@ class CreateMedicTables extends Migration
         //Общая база
         Schema::create('common_database', function (Blueprint $table) {
             $table->increments('id');
+            $table->unsignedInteger('new_mt_id')->nullable()->unique()->comment('ID пользователя нового МТ');
+            $table->unsignedInteger('old_mt_id')->nullable()->unique()->comment('ID пользователя старого МТ');
             $table->string('email')->unique()->comment('E-mail');
             $table->string('full_name')->nullable()->comment('ФИО');
             $table->string('city')->nullable()->comment('Город');
@@ -232,7 +237,7 @@ class CreateMedicTables extends Migration
             $table->string('gender')->nullable()->comment('Пол');
             $table->dateTime('birth_date')->nullable()->comment('Дата рождения');
             $table->string('registration_website')->nullable()->comment('Сайт регистрации');
-            $table->string('acquisition_tool')->nullable()->comment('Инструмент привлечения');
+            $table->text('acquisition_tool')->nullable()->comment('Инструммент привлечения');
             $table->string('acquisition_method')->nullable()->comment('Способ привлечения');
             $table->string('username')->nullable()->comment('Никнэйм');
             $table->text('specialization')->nullable()->comment('Название чатов в которых состоит пользователь');
@@ -257,10 +262,23 @@ class CreateMedicTables extends Migration
 
             $table->index('mt_user_id');
         });
+
+        Schema::create('users_chats', function (Blueprint $table) {
+            $table->id();
+            $table->string('full_name')->comment('ФИО');
+            $table->string('email')->comment('E-mail');
+            $table->string('username')->nullable()->comment('Никнэйм');
+            $table->string('specialization')->comment('Название чатов в которых состоит пользователь');
+            $table->string('channel')->nullable()->comment('Канал');
+            $table->dateTime('registration_date')->nullable()->comment('Время регистрации в чате');
+
+            $table->index('email');
+        });
     }
 
     public function down()
     {
+        Schema::dropIfExists('users_chats');
         Schema::dropIfExists('parsing_pd');
         Schema::dropIfExists('common_database');
         Schema::dropIfExists('unisender_participation');

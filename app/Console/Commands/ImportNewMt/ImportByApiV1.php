@@ -34,12 +34,15 @@ class ImportByApiV1 extends Common
      */
     protected int $apiVersion = 1;
 
+    protected bool $needLogs = false;
+
     /**
      * @throws \Exception
      */
     public function __construct()
     {
         parent::__construct();
+        $this->needLogs = env('APP_ENV') !== 'production';
     }
 
     /**
@@ -74,7 +77,7 @@ class ImportByApiV1 extends Common
             $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
                 $this->processEventsData($queryParams);
-                $this->processQuizData($queryParams);
+//                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -272,46 +275,62 @@ class ImportByApiV1 extends Common
         $page = 1;
         $totalProcessed = 0;
 
+        $queryParams['orderBy'] = 'asc';
+        $queryParams['order'] = 'event_id';
+
+        $batchActions = [];
+        $eventsInfo = [];
+
         while ($hasMorePages) {
             try {
-                $response = $this->getData('outer/event', $queryParams, $page);
+                $response = $this->getData('outer/facecast-stats-total', $queryParams, $page);
 
                 if (empty($response) || empty($data = $response['data'])) {
                     break;
                 }
 
                 //обработка данных законченных событий
-                foreach ($data as $eventData) {
+                foreach ($data as $fcData) {
+                    /** @var UserMT $user */
+                    $user = UserMT::query()->where('new_mt_id', $fcData['user']['id'])->exists();
+                    if (!$user) {
+                        $this->info("Не найден пользователь. Пропускаю...");
+                        continue;
+                    }
+                    $eventData = $fcData['event'];
                     $eventId = $eventData['id'];
                     if (is_null($eventData['finished_at'])) {
                         $this->info("Не законченное событие с ID $eventId. Пропускаю...");
                         continue;
                     }
 
-                    $format = $eventData['format'];
-                    $activity = $this->withTableLock('activities_mt', function () use ($eventData) {
-                        $activityData = $this->prepareActivityEventData($eventData);
+                    $additionalEventName = ' (day - ' .$fcData['day']['name'] . ', room - ' . $fcData['room']['name'] . ')';
+                    $activity = $this->withTableLock('activities_mt', function () use ($eventData, $additionalEventName) {
+                        $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
                         return ActivityMT::firstOrCreate(
                             $activityData,
                             $activityData
                         );
                     });
 
-                    $actionData = [
-                        'activity_id' => $activity->id,
-                    ];
-
-                    //формируем действия offline
-                    if (in_array($format, ['hybrid', 'offline'])) {
-                        $this->processActionsEvent('offline', $eventData['id'], $actionData);
+                    if (!isset($eventsInfo[$eventId])) {
+                        $eventsInfo[$eventId] = [
+                            'activity_id' => $activity->id,
+                            'format' => $eventData['format'],
+                            'started_at' => $eventData['started_at']
+                        ];
                     }
 
-                    //формируем действия online
-                    if (in_array($format, ['hybrid', 'online'])) {
-                        $this->processActionsEvent('online', $eventData['id'], $actionData);
-                    }
+                    //подготавливае действия
+                    $batchActions[] = $this->prepareActionFcData($fcData, $activity->id);
 
                     $totalProcessed++;
+                }
+
+                if (count($batchActions) >= self::BATCH_SIZE) {
+                    $this->insertActions($batchActions);
+                    $batchActions = [];
+                    gc_mem_caches(); //очищаем кэши памяти Zend Engine
                 }
 
                 //проверяем, есть ли следующая страница
@@ -327,22 +346,88 @@ class ImportByApiV1 extends Common
             }
         }
 
+        if (count($batchActions) > 0) {
+            $this->insertActions($batchActions);
+            $batchActions = [];
+            gc_mem_caches(); //очищаем кэши памяти Zend Engine
+        }
+
+        //формируем действия участников не посетивших мерроприятие
+        $this->processEventRegisteredUsers($eventsInfo);
+
         $this->info("Извлечено $totalProcessed событий");
+    }
+
+    /**
+     * Формируем действия участников не посетивших мерроприятие (duration 0, result 0)
+     * @param array $eventsInfo
+     * @throws \Exception
+     */
+    private function processEventRegisteredUsers(array $eventsInfo)
+    {
+        foreach ($eventsInfo as $eventId => $data) {
+            $format = $data['format'];
+            $actionData = [
+                'activity_id' => $data['activity_id'],
+                'date_time' => Carbon::parse($data['started_at'])->format('Y-m-d H:i:s'),
+                'duration' => 0,
+                'result' => 0
+            ];
+
+            //формируем действия участников offline
+            if (in_array($format, ['hybrid', 'offline'])) {
+                $this->processActionsEvent('offline', $eventId, $actionData);
+            }
+
+            //формируем действия участников online
+            if (in_array($format, ['hybrid', 'online'])) {
+                $this->processActionsEvent('online', $eventId, $actionData);
+            }
+        }
     }
 
     /**
      * Подготавливаем данные активности события
      * @param array $activityData
+     * @param string $additionalEventName
      * @return array
      */
     #[ArrayShape(['type' => "mixed", 'name' => "mixed", 'date_time' => "string", 'is_online' => "bool"])]
-    private function prepareActivityEventData(array $activityData): array
+    private function prepareActivityEventData(array $activityData, string $additionalEventName): array
     {
         return [
             'type' => $activityData['type'],
-            'name' => $activityData['name'],
+            'name' => $activityData['name'] . $additionalEventName,
             'date_time' => Carbon::parse($activityData['started_at'])->format('Y-m-d H:i:s'),
             'is_online' => in_array($activityData['format'], ['hybrid', 'online']),
+        ];
+    }
+
+    /**
+     * @param array $fcData
+     * @param int $activityId
+     * @return array
+     */
+    #[ArrayShape(['email' => "mixed", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float"])]
+    private function prepareActionFcData(array $fcData, int $activityId): array
+    {
+        //По мероприятиям, если я правильно понимаю, то тут для каждого мероприятия есть started_at+finished_at, значит мы можем посчитать сколько мероприятие шло
+        //а дальше длительность просмотра/на длительность мероприятия
+        //Это будет результат мероприятия
+
+        $totalWatchSeconds = $fcData['minutes_total_watched'] * 60;
+        $eventDuration = $this->getEventDurationInSeconds(
+            $fcData['event']['started_at'],
+            $fcData['event']['finished_at']
+        );
+
+        return [
+            'email' => $fcData['user']['email'],
+            'mt_user_id' => $fcData['user']['id'],
+            'activity_id' => $activityId,
+            'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),
+            'duration' => $this->formatDuration($totalWatchSeconds),
+            'result' => $this->calculateEventResult($totalWatchSeconds, $eventDuration)
         ];
     }
 
@@ -355,7 +440,7 @@ class ImportByApiV1 extends Common
      */
     private function processActionsEvent(string $format, int $eventId, array $actionMTData)
     {
-        $this->info("Извлекаем действия пользователей в событии с id $eventId, формат $format...");
+        $this->info("Извлекаем действия пользователей не участвовавших в мерроприятии в событии с id $eventId, формат $format...");
 
         $queryParams = [
             'pageSize' => $this->pageSize,
@@ -367,8 +452,7 @@ class ImportByApiV1 extends Common
 
         $usersMTData = [];
 
-        $actionsToInsert = [];
-        $countBatchInsert = 0;
+        $batchActions = [];
 
         try {
             while ($hasMorePages) {
@@ -382,31 +466,33 @@ class ImportByApiV1 extends Common
                     $newMTId = $actionData['user_id'];
                     if (empty($usersMTData[$newMTId])) {
                         /** @var UserMT $user */
-                        $user = UserMT::query()->where('new_mt_id', $newMTId)->select('id')->first();
+                        $user = UserMT::query()->where('new_mt_id', $newMTId)->select(['id', 'email'])->first();
                         if (!$user) {
                             $this->info("Не найден пользователь. Пропускаю...");
                             continue;
                         }
-                        $usersMTData[$newMTId] = $user->id;
+
+                        if (ActionMT::query()->where('mt_user_id', $newMTId)->where('activity_id', $actionMTData['activity_id'])->exists()) {
+                            $this->info("Пользователь уже имеет запись об активности. Пропускаю...");
+                            continue;
+                        }
+
+                        $usersMTData[$newMTId] = ['id' => $user->id, 'email' => $user->email];
                     }
 
-                    $actionMTData['mt_user_id'] = $usersMTData[$newMTId];
-
-                    //устанавливаем дефолтное значение, если created_at null, чтобы при вставке не было дублей
-                    $actionMTData['date_time'] = Carbon::parse($actionData['created_at'] ?? '1970-01-01 00:00:00')->format('Y-m-d H:i:s');
+                    $actionMTData['email'] = $usersMTData[$newMTId]['email'];
+                    $actionMTData['mt_user_id'] = $usersMTData[$newMTId]['id'];
 
                     //формируем пакет для вставки
-                    $actionsToInsert[] = $actionMTData;
+                    $batchActions[] = $actionMTData;
 
                     $totalProcessed++;
                 }
 
                 if ($totalProcessed % static::BATCH_SIZE === 0) {
-                    ++$countBatchInsert;
-                    $this->info("Пакетная вставка - $countBatchInsert");
-                    $this->insertActions($actionsToInsert);
+                    $this->insertActions($batchActions);
                     $usersMTData = [];
-                    $actionsToInsert = [];
+                    $batchActions = [];
                     gc_mem_caches(); //очищаем кэши памяти Zend Engine
                 }
 
@@ -419,119 +505,358 @@ class ImportByApiV1 extends Common
             }
 
             //вставляем оставшиеся записи
-            if (!empty($actionsToInsert)) {
-                ++$countBatchInsert;
-                $this->info("Пакетная вставка - $countBatchInsert");
-                $this->insertActions($actionsToInsert);
+            if (!empty($batchActions)) {
+                $this->insertActions($batchActions);
             }
         } catch (\Exception $e) {
             $this->error("Ошибка получения данных: " . $e->getMessage());
             throw $e;
         }
 
-        $this->info("Извлечено $totalProcessed действий пользователей");
+        $this->info("Извлечено $totalProcessed пользователей, не принимавших участие");
     }
 
     /**
-     * Вставляем действия пользователей пакетом
-     * @param array $actionsToInsert
-     */
-    private function insertActions(array $actionsToInsert)
-    {
-        $this->withTableLock('actions_mt', function () use ($actionsToInsert) {
-            ActionMT::insertOrIgnore($actionsToInsert);
-        });
-    }
-
-    /**
-     * Обрабатываем квизы (общая таблица - activities_mt)
+     * Обрабатываем квизы
+     * @param array $queryParams
      * @throws \Exception
      */
     private function processQuizData(array $queryParams)
     {
         $this->info("Извлекаем квизы...");
 
-        $hasMorePages = true;
-        $page = 1;
-        $totalProcessed = 0;
-
-        $usersMTData = [];
-
-        $actionsToInsert = [];
-        $countBatchInsert = 0;
+        //создаём временную таблицу
+        $this->createTempQuizTable();
 
         try {
-            while ($hasMorePages) {
-                $response = $this->getData("outer/qts", $queryParams, $page);
+            //заполняем временную таблицу
+            $this->fillTempQuizTable($queryParams);
 
-                if (empty($response) || empty($data = $response['data'])) {
-                    break;
-                }
+            //обрабатываем данные из временной таблицы
+            $processedCount = $this->processTempQuizData();
 
-                foreach ($data as $quizData) {
-                    $activity = $this->withTableLock('activities_mt', function () use ($quizData) {
-                        $activityData = [
-                            'type' => 'Квиз',
-                            'name' => $quizData['name'],
-                            'date_time' => $quizData['created_at'] ? Carbon::parse($quizData['created_at'])->format('Y-m-d H:i:s') : null
-                        ];
-                        return ActivityMT::firstOrCreate(
-                            $activityData,
-                            $activityData
-                        );
-                    });
-
-                    $newMTId = $quizData['user_id'];
-                    if (empty($usersMTData[$newMTId])) {
-                        /** @var UserMT $user */
-                        $user = UserMT::query()->where('new_mt_id', $newMTId)->select('id')->first();
-                        if (!$user) {
-                            $this->info("Не найден пользователь. Пропускаю...");
-                            continue;
-                        }
-                        $usersMTData[$newMTId] = $user->id;
-                    }
-
-                    $actionData = [
-                        'activity_id' => $activity->id,
-                        'mt_user_id' => $usersMTData[$newMTId],
-                        'date_time' => Carbon::parse($quizData['created_at'])->format('Y-m-d H:i:s'),
-                    ];
-
-                    //формируем пакет для вставки
-                    $actionsToInsert[] = $actionData;
-
-                    $totalProcessed++;
-                }
-
-                if ($totalProcessed % static::BATCH_SIZE === 0) {
-                    ++$countBatchInsert;
-                    $this->info("Пакетная вставка - $countBatchInsert");
-                    $this->insertActions($actionsToInsert);
-                    $usersMTData = [];
-                    $actionsToInsert = [];
-                    gc_mem_caches(); //очищаем кэши памяти Zend Engine
-                }
-
-                //проверяем, есть ли следующая страница
-                $hasMorePages = !empty($response['next_page_url']);
-                $page++;
-
-                //задержка между запросами
-                sleep(1);
-            }
-
-            //вставляем оставшиеся записи
-            if (!empty($actionsToInsert)) {
-                ++$countBatchInsert;
-                $this->info("Пакетная вставка - $countBatchInsert");
-                $this->insertActions($actionsToInsert);
-            }
+            $this->info("Обработано $processedCount записей квизов");
         } catch (\Exception $e) {
-            $this->error("Ошибка получения данных: " . $e->getMessage());
+            $this->error("Ошибка при обработке квизов: " . $e->getMessage());
             throw $e;
+        } finally {
+            // 3. Удаляем временную таблицу
+            $this->dropTempQuizTable();
+        }
+    }
+
+    /**
+     * Создаём временную таблицу для хранения данных квизов
+     */
+    private function createTempQuizTable()
+    {
+        DB::statement('
+        CREATE TEMPORARY TABLE temp_quiz_actions (
+            id SERIAL,
+            user_id INTEGER NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            action_time TIMESTAMP NOT NULL,
+            action_type VARCHAR(50) NOT NULL,
+            quiz_question_code VARCHAR(255) NULL,
+            is_correct BOOLEAN NULL,
+            PRIMARY KEY (id)
+        )
+    ');
+
+        DB::statement('CREATE INDEX idx_temp_quiz_user_name ON temp_quiz_actions (user_id, name)');
+        DB::statement('CREATE INDEX idx_temp_quiz_action_time ON temp_quiz_actions (action_time)');
+
+        $this->info("Создана временная таблица temp_quiz_actions");
+    }
+
+    /**
+     * Заполняем временную таблицу данными из API
+     * @param array $queryParams
+     * @throws \Exception
+     */
+    private function fillTempQuizTable(array $queryParams)
+    {
+        $queryParams['orderBy'] = 'asc';
+        $queryParams['order'] = 'user_id';
+
+        $hasMorePages = true;
+        $page = 1;
+        $totalInserted = 0;
+
+        while ($hasMorePages) {
+            $response = $this->getData("outer/qts", $queryParams, $page);
+
+            if (empty($response) || empty($data = $response['data'])) {
+                break;
+            }
+
+            $batch = [];
+            foreach ($data as $quizData) {
+                $batch[] = [
+                    'user_id' => $quizData['user_id'],
+                    'name' => $quizData['name'],
+                    'action_time' => $quizData['created_at'],
+                    'action_type' => $quizData['action'],
+                    'quiz_question_code' => $quizData['quiz_question_code'],
+                    'is_correct' => $quizData['is_correct'],
+                ];
+            }
+
+            DB::table('temp_quiz_actions')->insert($batch);
+            $totalInserted += count($batch);
+
+            $hasMorePages = !empty($response['next_page_url']);
+            $page++;
+            sleep(1);
         }
 
-        $this->info("Извлечено $totalProcessed квизов");
+        $this->info("Загружено $totalInserted действий во временную таблицу");
+    }
+
+    /**
+     * Обрабатываем данные из временной таблицы квизов
+     * @return int
+     */
+    private function processTempQuizData(): int
+    {
+        //создаем временную таблицу с нумерованными действиями
+        DB::statement('
+        CREATE TEMPORARY TABLE temp_quiz_actions_ordered AS
+        SELECT
+            *,
+            ROW_NUMBER() OVER (PARTITION BY user_id, name ORDER BY action_time) as action_num
+        FROM temp_quiz_actions
+        ORDER BY user_id, name, action_time
+    ');
+
+        if ($this->needLogs) {
+            //логируем примеры записей из исходной таблицы
+            $sampleRecords = DB::table('temp_quiz_actions')
+                ->select('user_id', 'name', 'action_time', 'action_type', 'quiz_question_code', 'is_correct')
+                ->orderBy('user_id')
+                ->orderBy('action_time')
+                ->limit(10)
+                ->get()
+                ->toArray();
+
+            Log::debug("Примеры записей из temp_quiz_actions:", $sampleRecords);
+        }
+
+
+        //создаем таблицу с 10-минутными группами
+        DB::statement('
+        CREATE TEMPORARY TABLE temp_quiz_windows AS
+        WITH RECURSIVE action_groups AS (
+            SELECT
+                user_id,
+                name,
+                action_time as window_start,
+                action_time as current_action,
+                action_num,
+                action_type,
+                1 as group_id
+            FROM temp_quiz_actions_ordered
+            WHERE action_num = 1
+
+            UNION ALL
+            SELECT
+                a.user_id,
+                a.name,
+                CASE
+                    WHEN EXTRACT(EPOCH FROM (a.action_time - ag.window_start)) > 600
+                    THEN a.action_time
+                    ELSE ag.window_start
+                END as window_start,
+                a.action_time as current_action,
+                a.action_num,
+                a.action_type,
+                CASE
+                    WHEN EXTRACT(EPOCH FROM (a.action_time - ag.window_start)) > 600
+                    THEN ag.group_id + 1
+                    ELSE ag.group_id
+                END as group_id
+            FROM temp_quiz_actions_ordered a
+            JOIN action_groups ag ON
+                a.user_id = ag.user_id AND
+                a.name = ag.name AND
+                a.action_num = ag.action_num + 1
+        )
+        SELECT
+            user_id,
+            name,
+            group_id,
+            window_start,
+            MAX(current_action) as window_end,
+            COUNT(*) as actions_count,
+            MAX(CASE WHEN action_type = \'answer\' THEN 1 ELSE 0 END) as has_answer
+        FROM action_groups
+        GROUP BY user_id, name, group_id, window_start
+        ORDER BY user_id, name, window_start
+    ');
+
+        if ($this->needLogs) {
+            //логируем сформированные группы
+            $sampleGroups = DB::table('temp_quiz_windows')
+                ->select('user_id', 'name', 'group_id', 'window_start', 'window_end', 'actions_count', 'has_answer')
+                ->orderBy('user_id')
+                ->orderBy('window_start')
+                ->limit(10)
+                ->get()
+                ->toArray();
+
+            Log::debug("Примеры сформированных 10-минутных групп:", $sampleGroups);
+
+            //для каждой группы логируем входящие в нее записи
+            foreach ($sampleGroups as $group) {
+                $groupRecords = DB::table('temp_quiz_actions_ordered')
+                    ->where('user_id', $group->user_id)
+                    ->where('name', $group->name)
+                    ->whereBetween('action_time', [$group->window_start, $group->window_end])
+                    ->orderBy('action_time')
+                    ->get()
+                    ->toArray();
+
+                Log::debug("Записи группы {$group->group_id} для пользователя {$group->user_id}, квиз '{$group->name}':", [
+                    'window_start' => $group->window_start,
+                    'window_end' => $group->window_end,
+                    'duration_seconds' => Carbon::parse($group->window_end)->diffInSeconds(Carbon::parse($group->window_start)),
+                    'records' => $groupRecords
+                ]);
+            }
+        }
+
+        //получаем список уникальных пользователей
+        $userIds = DB::table('temp_quiz_windows')
+            ->distinct()
+            ->pluck('user_id')
+            ->toArray();
+
+        //предзагружаем данные пользователей
+        $users = UserMT::query()
+            ->whereIn('new_mt_id', $userIds)
+            ->get()
+            ->keyBy('new_mt_id');
+
+        //обрабатываем данные чанками
+        $processedCount = 0;
+        $batchActions = [];
+        $batchSize = static::BATCH_SIZE;
+
+        DB::table('temp_quiz_windows')
+            ->orderBy('user_id')
+            ->orderBy('window_start')
+            ->chunk($batchSize, function ($groups) use ($users, &$batchActions, &$processedCount, $batchSize) {
+                foreach ($groups as $group) {
+                    if (!isset($users[$group->user_id])) {
+                        continue;
+                    }
+
+                    $user = $users[$group->user_id];
+
+                    //рассчитываем duration между первым и последним действием в окне
+                    $duration = Carbon::parse($group->window_end)
+                        ->diffInSeconds(Carbon::parse($group->window_start));
+
+                    $activity = ActivityMT::firstOrCreate(
+                        [
+                            'type' => 'Квиз',
+                            'name' => $group->name
+                        ],
+                        [
+                            'date_time' => $group->window_start,
+                            'is_online' => true
+                        ]
+                    );
+
+                    $formattedDuration = $this->formatDuration($duration);
+                    if ($formattedDuration == 0) {
+                        $formattedDuration = 0.01;
+                    }
+
+                    $batchActions[] = [
+                        'email' => $user->email,
+                        'mt_user_id' => $user->id,
+                        'activity_id' => $activity->id,
+                        'date_time' => $group->window_start,
+                        'duration' => $formattedDuration,
+                        'result' => $group->has_answer ? 100 : 0,
+                    ];
+
+                    $processedCount++;
+
+                    if (count($batchActions) >= $batchSize) {
+                        $this->insertActions($batchActions);
+                        $batchActions = [];
+                    }
+                }
+            });
+
+        if (!empty($batchActions)) {
+            $this->insertActions($batchActions);
+        }
+
+        return $processedCount;
+    }
+
+    /**
+     * Вставляем действия пользователей пакетом
+     * @param array $batchActions
+     */
+    private function insertActions(array $batchActions)
+    {
+        $this->info("Пакетная вставка - " . count($batchActions));
+        $this->withTableLock('actions_mt', function () use ($batchActions) {
+            ActionMT::insertOrIgnore($batchActions);
+        });
+    }
+
+    /**
+     * Удаляем временную таблицу
+     */
+    private function dropTempQuizTable()
+    {
+        DB::statement('DROP TABLE IF EXISTS temp_quiz_actions_ordered');
+        DB::statement('DROP TABLE IF EXISTS temp_quiz_windows');
+        DB::statement('DROP TABLE IF EXISTS temp_quiz_actions');
+        $this->info("Временные таблицы удалены");
+    }
+
+    /**
+     * Форматируем duration в минуты.секунды
+     * @param int $seconds
+     * @return string
+     */
+    private function formatDuration(int $seconds): string
+    {
+        $minutes = floor($seconds / 60);
+        $seconds = $seconds % 60;
+        return sprintf('%d.%02d', $minutes, $seconds);
+    }
+
+    /**
+     * Вычисляем длительность мероприятия в секундах
+     * @param string $startedAt
+     * @param string $finishedAt
+     * @return int
+     */
+    private function getEventDurationInSeconds(string $startedAt, string $finishedAt): int
+    {
+        return Carbon::parse($finishedAt)->diffInSeconds(Carbon::parse($startedAt));
+    }
+
+    /**
+     * Вычисляем результат мероприятия в процентах
+     * @param int $watchSeconds     - время просмотра в секундах
+     * @param int $eventDuration    - длительность мероприятия в секундах
+     * @return float                - результат в процентах (0-100)
+     */
+    private function calculateEventResult(int $watchSeconds, int $eventDuration): float
+    {
+        if ($eventDuration <= 0) {
+            return 0.0;
+        }
+
+        $percentage = ($watchSeconds / $eventDuration) * 100;
+        return (float) min(round($percentage, 2), 100.0);
     }
 }
