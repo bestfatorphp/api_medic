@@ -36,7 +36,7 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:new-mt-users --onlyUsers=1')
+        $schedule->command('import:new-mt-users --updated_after=01.01.2025')
             ->yearlyOn(now()->month, now()->day, '12:59')
             ->timezone('Europe/Moscow')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
