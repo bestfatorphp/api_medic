@@ -77,7 +77,7 @@ class ImportByApiV1 extends Common
             $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
                 $this->processEventsData($queryParams);
-//                $this->processQuizData($queryParams);
+                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
