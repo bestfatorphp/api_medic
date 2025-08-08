@@ -303,9 +303,10 @@ class ImportByApiV1 extends Common
                         $this->info("Не законченное событие с ID $eventId. Пропускаю...");
                         continue;
                     }
-                    $additionalEventName = '(';
+
                     $issetDay = isset($fcData['day']);
                     $issetRoom = isset($fcData['room']);
+                    $additionalEventName = !$issetDay && !$issetRoom ? '' : ' (';
                     if ($issetDay) {
                         $additionalEventName .= 'day - ' .$fcData['day']['name'] . (!$issetRoom ? ')' : ', ');
                     }

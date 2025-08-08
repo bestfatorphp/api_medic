@@ -36,15 +36,15 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:new-mt-users --onlyUsers=1')
-            ->yearlyOn(now()->month, now()->day, '13:25')
-            ->timezone('Europe/Moscow')
-            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
-
-//        $schedule->command('import:new-mt-users --updated_after=01.01.2025')
-//            ->yearlyOn(now()->month, now()->day, '13:10')
+//        $schedule->command('import:new-mt-users --onlyUsers=1')
+//            ->yearlyOn(now()->month, now()->day, '13:25')
 //            ->timezone('Europe/Moscow')
 //            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
+
+        $schedule->command('import:new-mt-users --updated_after=01.01.2025')
+            ->yearlyOn(now()->month, now()->day, '14:05')
+            ->timezone('Europe/Moscow')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
