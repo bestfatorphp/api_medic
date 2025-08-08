@@ -303,8 +303,15 @@ class ImportByApiV1 extends Common
                         $this->info("Не законченное событие с ID $eventId. Пропускаю...");
                         continue;
                     }
-
-                    $additionalEventName = ' (day - ' .$fcData['day']['name'] . ', room - ' . $fcData['room']['name'] . ')';
+                    $additionalEventName = '(';
+                    $issetDay = isset($fcData['day']);
+                    $issetRoom = isset($fcData['room']);
+                    if ($issetDay) {
+                        $additionalEventName .= 'day - ' .$fcData['day']['name'] . (!$issetRoom ? ')' : ', ');
+                    }
+                    if ($issetRoom) {
+                        $additionalEventName .= 'room - ' . $fcData['room']['name'] . ')';
+                    }
                     $activity = $this->withTableLock('activities_mt', function () use ($eventData, $additionalEventName) {
                         $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
                         return ActivityMT::firstOrCreate(
