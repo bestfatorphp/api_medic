@@ -22,7 +22,7 @@ class ImportByApiV2 extends Common
 
     protected $signature = 'import:new-mt-touches
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=500 : Колличество записей за один запрос}';
+                            {--pageSize=200 : Колличество записей за один запрос}';
 
     protected $description = 'Импорт касаний нового сайта МедТач, в ограниченной памяти';
 
