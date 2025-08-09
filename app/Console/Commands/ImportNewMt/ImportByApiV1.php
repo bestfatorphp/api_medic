@@ -548,7 +548,7 @@ class ImportByApiV1 extends Common
             $this->error("Ошибка при обработке квизов: " . $e->getMessage());
             throw $e;
         } finally {
-            // 3. Удаляем временную таблицу
+            //удаляем временные таблицы
             $this->dropTempQuizTable();
         }
     }
@@ -819,7 +819,7 @@ class ImportByApiV1 extends Common
     }
 
     /**
-     * Удаляем временную таблицу
+     * Удаляем временные таблицу
      */
     private function dropTempQuizTable()
     {
