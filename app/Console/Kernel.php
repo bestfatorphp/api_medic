@@ -41,17 +41,17 @@ class Kernel extends ConsoleKernel
 //            ->timezone('Europe/Moscow')
 //            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
-        $schedule->command('import:new-mt-users --updated_after=01.01.2025')
-            ->yearlyOn(now()->month, now()->day, '14:05')
+        $schedule->command('import:new-mt-users')
+            ->yearlyOn(now()->month, now()->day, '11:50')
             ->timezone('Europe/Moscow')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
-//        $schedule->command('import:new-mt-users')
-//            ->dailyAt('00:10')
-//            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
-//
+        $schedule->command('import:new-mt-users')
+            ->dailyAt('00:10')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
+
 //        $schedule->command('import:new-mt-touches')
 //            ->dailyAt('00:20')
 //            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
