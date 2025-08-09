@@ -20,9 +20,9 @@ class Kernel extends ConsoleKernel
 
         //import:users-chats - разовая команда (отработала)
 
-        //import:old-mt-users - разовая команда
+        //import:old-mt-users - разовая команда (отработала)
 
-        //import:new-mt-users --onlyUsers=1
+        //import:new-mt-users --onlyUsers=1 (отработала)
         //import:new-mt-users --updated_after=01.01.2025 (отработала)
 
         //import:new-mt-touches --updated_after=01.05.2025
@@ -41,8 +41,8 @@ class Kernel extends ConsoleKernel
 //            ->timezone('Europe/Moscow')
 //            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
-        $schedule->command('import:old-mt-users')
-            ->yearlyOn(now()->month, now()->day, '12:07')
+        $schedule->command('import:new-mt-touches --updated_after=01.05.2025')
+            ->yearlyOn(now()->month, now()->day, '12:10')
             ->timezone('Europe/Moscow')
             ->sendOutputTo(storage_path("{$commonPath}import-users-chats.log"));
 
