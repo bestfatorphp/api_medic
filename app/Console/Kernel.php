@@ -55,9 +55,9 @@ class Kernel extends ConsoleKernel
 //            ->dailyAt('00:30')
 //            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
 
-        $schedule->command('import:sendsay-stats')
-            ->dailyAt('02:40')
-            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
+//        $schedule->command('import:sendsay-stats')
+//            ->dailyAt('00:40')
+//            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
         $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
             ->dailyAt('03:30')
