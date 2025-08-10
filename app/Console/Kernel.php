@@ -4,6 +4,8 @@ namespace App\Console;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 
 class Kernel extends ConsoleKernel
 {
@@ -46,11 +48,11 @@ class Kernel extends ConsoleKernel
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
         $schedule->command('import:new-mt-users')
-            ->dailyAt('00:10')
+            ->dailyAt('20:44')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
         $schedule->command('import:new-mt-touches')
-            ->dailyAt('00:20')
+            ->dailyAt('20:49')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
 //        $schedule->command('import:id-campaigns')
@@ -58,16 +60,39 @@ class Kernel extends ConsoleKernel
 //            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
 
         $schedule->command('import:sendsay-stats')
-            ->dailyAt('00:40')
+            ->dailyAt('20:59')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
         $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->dailyAt('01:30')
+            ->dailyAt('22:55')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
-            ->then(function () use ($schedule, $commonPath) {
+            ->then(function () use ($commonPath) {
+                //создаём и запускаем команду вручную с ожиданием, пока не отработает первая,
+                //т.к. работают на одном порту, парралельная работа невозможна, нужно чтобы осуществился выход из клиента
                 sleep(60);
-                $schedule->command('import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true')
-                    ->sendOutputTo(storage_path("{$commonPath}import-medtouch-reg-users.log"));
+
+                //удаляем старый файл, если он существует
+                $logFile = storage_path("{$commonPath}import-medtouch-reg-users.log");
+                if (file_exists($logFile)) {
+                    unlink($logFile);
+                }
+
+                $command = new \App\Console\Commands\ImportBitrixMt\ImportMTRegisteredUsersFile();
+                $command->setLaravel(app());
+                $exitCode = $command->run(
+                    new \Symfony\Component\Console\Input\ArrayInput([
+                        '--chunk' => 5,
+                        '--timeout' => 120,
+                        '--need-file' => true,
+                    ]),
+                    new \Symfony\Component\Console\Output\StreamOutput(
+                        fopen($logFile, 'w')
+                    )
+                );
+
+                if ($exitCode !== 0) {
+                    Log::error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
+                }
             });
 
 

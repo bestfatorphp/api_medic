@@ -191,7 +191,7 @@ class ImportMTHeliosFile extends Common
                             }
                         }
                     } else {
-                        Log::warning("Некорректная строка с пользователем: " . json_encode($row));
+                        Log::channel('commands')->warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
                     }
                     continue;

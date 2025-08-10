@@ -415,7 +415,7 @@ class ImportCampaignsSandSay extends Command
 
 
         if(!empty($response['errors']) || !empty($response['error'])) {
-            Log::error('err:', $response);
+            Log::channel('commands')->error('err:', $response);
         }
 
         return $response['list'] ?? [];

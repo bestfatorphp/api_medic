@@ -647,7 +647,7 @@ class ImportByApiV1 extends Common
                 ->get()
                 ->toArray();
 
-            Log::debug("Примеры записей из temp_quiz_actions:", $sampleRecords);
+            Log::channel('commands')->debug("Примеры записей из temp_quiz_actions:", $sampleRecords);
         }
 
 
@@ -712,7 +712,7 @@ class ImportByApiV1 extends Common
                 ->get()
                 ->toArray();
 
-            Log::debug("Примеры сформированных 10-минутных групп:", $sampleGroups);
+            Log::channel('commands')->debug("Примеры сформированных 10-минутных групп:", $sampleGroups);
 
             //для каждой группы логируем входящие в нее записи
             foreach ($sampleGroups as $group) {
@@ -724,7 +724,7 @@ class ImportByApiV1 extends Common
                     ->get()
                     ->toArray();
 
-                Log::debug("Записи группы {$group->group_id} для пользователя {$group->user_id}, квиз '{$group->name}':", [
+                Log::channel('commands')->debug("Записи группы {$group->group_id} для пользователя {$group->user_id}, квиз '{$group->name}':", [
                     'window_start' => $group->window_start,
                     'window_end' => $group->window_end,
                     'duration_seconds' => Carbon::parse($group->window_end)->diffInSeconds(Carbon::parse($group->window_start)),

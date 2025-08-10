@@ -306,7 +306,6 @@ class ImportMTRegisteredUsersFile extends Common
 
         $commonDBBatch = [];
         $EMAILS = [];
-        $OLD_MT_IDS = [];
 
         try {
             while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
@@ -319,15 +318,14 @@ class ImportMTRegisteredUsersFile extends Common
                     continue;
                 }
 
-                if (in_array($email, $EMAILS) || in_array($oldMtId = $row[0], $OLD_MT_IDS)) {
-                    Log::info("Дубликат - $email");
+                if (in_array($email, $EMAILS)) {
+                    Log::channel('commands')->info("Дубликат - $email");
                     continue;
                 }
 
                 $EMAILS[] = $email;
-                $OLD_MT_IDS[] = $oldMtId;
 
-                list($userMTData, $commonDbData) = $this->prepareUsersMtAndCommonDb($row);
+                list($userMTData, $commonDbData) = $this->prepareUserMtAndCommonDb($row);
 
                 $userMt = $this->withTableLock('users_mt', function () use ($userMTData) {
                     return UserMT::updateOrCreateWithMutators(
@@ -353,8 +351,8 @@ class ImportMTRegisteredUsersFile extends Common
                 });
 
                 if (!$userMt) {
-                    $this->error("Ошибка создания/обновления пользователя: {$userMTData['email']}");
-                    Log::error("Ошибка создания/обновления пользователя", $userMTData);
+                    $this->warn("Ошибка создания/обновления пользователя: {$userMTData['email']}");
+                    Log::channel('commands')->warning("Ошибка создания/обновления пользователя", $userMTData);
                     continue;
                 }
 
@@ -363,13 +361,13 @@ class ImportMTRegisteredUsersFile extends Common
                 $commonDBBatch[] = $commonDbData;
 
                 if (count($commonDBBatch) >= self::BATCH_SIZE) {
-                    $this->upsertBatchCommonDb($commonDBBatch, $EMAILS, $OLD_MT_IDS);
+                    $this->upsertBatchCommonDb($commonDBBatch, $EMAILS);
                 }
 
             }
             //вставляем оставшиеся записи
             if (!empty($commonDBBatch)) {
-                $this->upsertBatchCommonDb($commonDBBatch, $EMAILS, $OLD_MT_IDS);
+                $this->upsertBatchCommonDb($commonDBBatch, $EMAILS);
             }
         } finally {
             fclose($handle);
@@ -383,7 +381,7 @@ class ImportMTRegisteredUsersFile extends Common
      * @param array $row
      * @return array[]
      */
-    private function prepareUsersMtAndCommonDb(array $row): array
+    private function prepareUserMtAndCommonDb(array $row): array
     {
         list(
             $old_mt_id,                 //ID
@@ -472,7 +470,7 @@ class ImportMTRegisteredUsersFile extends Common
         ];
     }
 
-    private function upsertBatchCommonDb(array &$commonDBBatch, array &$EMAILS, array &$OLD_MT_IDS)
+    private function upsertBatchCommonDb(array &$commonDBBatch, array &$EMAILS)
     {
         $this->info("Пакетная вставка - " . count($commonDBBatch));
         $this->withTableLock('common_database', function () use ($commonDBBatch) {
@@ -498,7 +496,6 @@ class ImportMTRegisteredUsersFile extends Common
 
         $commonDBBatch = [];
         $EMAILS = [];
-        $OLD_MT_IDS = [];
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 }
