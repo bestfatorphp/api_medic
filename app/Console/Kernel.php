@@ -29,6 +29,8 @@ class Kernel extends ConsoleKernel
 
         //import:medtouch-helios --chunk=5 --timeout=120 --need-file=true (отработала)
 
+        //import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true
+
         //import:id-campaigns (ПРОВЕРИТЬ!!!)
 
         //import:sendsay-stats --from=01.05.2025 (отработала)
@@ -61,9 +63,12 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
             ->dailyAt('01:30')
-            ->sendOutputTo(storage_path("{$commonPath}import-medtouch.log"));
-
-
+            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
+            ->then(function () use ($schedule, $commonPath) {
+                sleep(60);
+                $schedule->command('import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true')
+                    ->sendOutputTo(storage_path("{$commonPath}import-medtouch-reg-users.log"));
+            });
 
 
         //разовая команда (после оплаты аккаунта собрать)

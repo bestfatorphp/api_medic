@@ -144,11 +144,31 @@ class CommonDatabase extends Model
     }
 
     /**
+     * Мутатор для new_mt_id
+     */
+    public function setNewMtIdAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['new_mt_id'] ?? null)) {
+            $this->attributes['new_mt_id'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для old_mt_id
+     */
+    public function setOldMtIdAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['old_mt_id'] ?? null)) {
+            $this->attributes['old_mt_id'] = $value;
+        }
+    }
+
+    /**
      * Мутатор для email
      */
     public function setEmailAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['email'] ?? null)) {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['email'] ?? null)) {
             $this->attributes['email'] = $value;
         }
     }
@@ -219,44 +239,60 @@ class CommonDatabase extends Model
     }
 
     /**
+     * Мутатор для phone
+     */
+    public function setPhoneAttribute($value)
+    {
+        $value = $value ? preg_replace('/[^0-9]/', '', $value) : null;
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['phone'] ?? null)) {
+            $this->attributes['phone'] = $value;
+        }
+    }
+
+    /**
      * Мутатор для mt_user_id
      */
     public function setMtUserIdAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['mt_user_id'] ?? null)) {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['mt_user_id'] ?? null)) {
             $this->attributes['mt_user_id'] = $value;
         }
     }
 
     /**
-     * Мутатор для new_mt_id
+     * Мутатор для registration_date
      */
-    public function setNewMtIdAttribute($value)
+    public function setRegistrationDateAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['new_mt_id'] ?? null)) {
-            $this->attributes['new_mt_id'] = $value;
+        $this->attributes['registration_date'] = Carbon::parse($value);
+    }
+
+    /**
+     * Мутатор для gender
+     */
+    public function setGenderAttribute($value)
+    {
+        $this->attributes['gender'] = $this->genderCommon($value);
+    }
+
+    /**
+     * Мутатор для birth_date
+     */
+    public function setBirthDateAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['birth_date'] ?? null)) {
+            $this->attributes['birth_date'] = $value;
         }
     }
 
     /**
-     * Мутатор для old_mt_id
+     * Мутатор для registration_website
      */
-    public function setOldMtIdAttribute($value)
+    public function setRegistrationWebsiteAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['old_mt_id'] ?? null)) {
-            $this->attributes['old_mt_id'] = $value;
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['registration_website'] ?? null)) {
+            $this->attributes['registration_website'] = $value;
         }
-    }
-
-    /**
-     * Мутатор для specialization
-     */
-    public function setSpecializationAttribute($value)
-    {
-        $this->attributes['specialization'] = $this->mergeCommaSeparatedValues(
-            $value,
-            $this->attributes['specialization'] ?? null
-        );
     }
 
     /**
@@ -271,18 +307,13 @@ class CommonDatabase extends Model
     }
 
     /**
-     * Мутатор для phone
+     * Мутатор для specialization
      */
-    public function setPhoneAttribute($value)
+    public function setSpecializationAttribute($value)
     {
-        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
-    }
-
-    /**
-     * Мутатор для registration_date
-     */
-    public function setRegistrationDateAttribute($value)
-    {
-        $this->attributes['registration_date'] = Carbon::parse($value);
+        $this->attributes['specialization'] = $this->mergeCommaSeparatedValues(
+            $value,
+            $this->attributes['specialization'] ?? null
+        );
     }
 }

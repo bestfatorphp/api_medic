@@ -84,12 +84,22 @@ class UserMT extends Model
     }
 
     /**
-     * Мутатор для email
+     * Мутатор для new_mt_id
      */
-    public function setEmailAttribute($value)
+    public function setNewMtIdAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['email'] ?? null)) {
-            $this->attributes['email'] = $value;
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['new_mt_id'] ?? null)) {
+            $this->attributes['new_mt_id'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для old_mt_id
+     */
+    public function setOldMtIdAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['old_mt_id'] ?? null)) {
+            $this->attributes['old_mt_id'] = $value;
         }
     }
 
@@ -107,14 +117,87 @@ class UserMT extends Model
     }
 
     /**
-     * Мутатор для city
+     * Мутатор для email
      */
-    public function setCityAttribute($value)
+    public function setEmailAttribute($value)
     {
-        if ($this->shouldUpdateFieldByLength($value, $this->attributes['city'] ?? null)) {
-            $this->attributes['city'] = $this->toUpperCase(
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['email'] ?? null)) {
+            $this->attributes['email'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для gender
+     */
+    public function setGenderAttribute($value)
+    {
+        $this->attributes['gender'] = $this->genderCommon($value);
+    }
+
+    /**
+     * Мутатор для birth_date
+     */
+    public function setBirthDateAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['birth_date'] ?? null)) {
+            $this->attributes['birth_date'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для specialty
+     */
+    public function setSpecialtyAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['specialty'] ?? null)) {
+            $this->attributes['specialty'] = $this->toUpperCase(
                 $value,
-                $this->attributes['city'] ?? null
+                $this->attributes['specialty'] ?? null
+            );
+        }
+    }
+
+    /**
+     * Мутатор для phone
+     */
+    public function setPhoneAttribute($value)
+    {
+        $value = $value ? preg_replace('/[^0-9]/', '', $value) : null;
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['phone'] ?? null)) {
+            $this->attributes['phone'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для place_of_employment
+     */
+    public function setPlaceOfEmploymentAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['place_of_employment'] ?? null)) {
+            $this->attributes['place_of_employment'] = $this->toUpperCase(
+                $value,
+                $this->attributes['place_of_employment'] ?? null
+            );
+        }
+    }
+
+    /**
+     * Мутатор для registration_date
+     */
+    public function setRegistrationDateAttribute($value)
+    {
+        $this->attributes['registration_date'] = Carbon::parse($value)->format('Y-m-d');
+    }
+
+    /**
+     * Мутатор для country
+     */
+    public function setCountryAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['country'] ?? null)) {
+            $this->attributes['country'] = $this->toUpperCase(
+                $value,
+                $this->attributes['country'] ?? null
             );
         }
     }
@@ -133,64 +216,55 @@ class UserMT extends Model
     }
 
     /**
-     * Мутатор для country
+     * Мутатор для city
      */
-    public function setCountryAttribute($value)
+    public function setCityAttribute($value)
     {
-        if ($this->shouldUpdateFieldByLength($value, $this->attributes['country'] ?? null)) {
-            $this->attributes['country'] = $this->toUpperCase(
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['city'] ?? null)) {
+            $this->attributes['city'] = $this->toUpperCase(
                 $value,
-                $this->attributes['country'] ?? null
+                $this->attributes['city'] ?? null
             );
         }
     }
 
     /**
-     * Мутатор для specialty
+     * Мутатор для registration_website
      */
-    public function setSpecialtyAttribute($value)
+    public function setRegistrationWebsiteAttribute($value)
     {
-        if ($this->shouldUpdateFieldByLength($value, $this->attributes['specialty'] ?? null)) {
-            $this->attributes['specialty'] = $this->toUpperCase(
-                $value,
-                $this->attributes['specialty'] ?? null
-            );
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['registration_website'] ?? null)) {
+            $this->attributes['registration_website'] = $value;
         }
     }
 
     /**
-     * Мутатор для new_mt_id
+     * Мутатор для uf_utm_term
      */
-    public function setNewMtIdAttribute($value)
+    public function setUfUtmTermAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['new_mt_id'] ?? null)) {
-            $this->attributes['new_mt_id'] = $value;
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['uf_utm_term'] ?? null)) {
+            $this->attributes['uf_utm_term'] = $value;
         }
     }
 
     /**
-     * Мутатор для old_mt_id
+     * Мутатор для uf_utm_campaign
      */
-    public function setOldMtIdAttribute($value)
+    public function setUfUtmCampaignAttribute($value)
     {
-        if ($this->shouldUpdateFieldIfNotNull($value, $this->attributes['old_mt_id'] ?? null)) {
-            $this->attributes['old_mt_id'] = $value;
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['uf_utm_campaign'] ?? null)) {
+            $this->attributes['uf_utm_campaign'] = $value;
         }
     }
 
     /**
-     * Мутатор для phone
+     * Мутатор для uf_utm_content
      */
-    public function setPhoneAttribute($value)
+    public function setUfUtmContentAttribute($value)
     {
-        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
-    }
-
-    /**
-     * Мутатор для registration_date
-     */
-    public function setRegistrationDateAttribute($value)
-    {
-        $this->attributes['registration_date'] = Carbon::parse($value)->format('Y-m-d');
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['uf_utm_content'] ?? null)) {
+            $this->attributes['uf_utm_content'] = $value;
+        }
     }
 }

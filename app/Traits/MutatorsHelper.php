@@ -135,7 +135,7 @@ trait MutatorsHelper
      * @param mixed $currentValue
      * @return bool
      */
-    protected function shouldUpdateFieldIfNotNull(mixed $newValue, mixed $currentValue): bool
+    protected function shouldUpdateFieldIfNull(mixed $newValue, mixed $currentValue): bool
     {
         if (empty($newValue)) {
             return false;
@@ -190,5 +190,27 @@ trait MutatorsHelper
         }
 
         return mb_strtoupper($newValue, 'UTF-8');
+    }
+
+    /**
+     * Общий формат пола
+     * @param string|null $newValue
+     * @return string|null
+     */
+    protected function genderCommon(?string $newValue): ?string
+    {
+        if (!$newValue) {
+            return null;
+        }
+
+        if (in_array($newValue, ['m', 'M', 'male'])) {
+            return 'M';
+        }
+
+        if (in_array($newValue, ['f', 'F', 'female'])) {
+            return 'F';
+        }
+
+        return null;
     }
 }

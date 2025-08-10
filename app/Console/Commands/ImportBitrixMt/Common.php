@@ -1,84 +1,84 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\ImportBitrixMt;
 
-use App\Logging\CustomLog;
-use App\Models\ActionMT;
-use App\Models\ActivityMT;
-use App\Models\CommonDatabase;
-use App\Models\UserMT;
+use App\Facades\UniSender;
+use App\Models\UnisenderCampaign;
+use App\Models\UnisenderContact;
+use App\Models\UnisenderParticipation;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Console\Command\Command as CommandAlias;
+use Illuminate\Support\Facades\Storage;
+use JetBrains\PhpStorm\NoReturn;
 use Symfony\Component\Panther\Client;
 
-//todo: Перед использованием, установки на сервере для Panther
-class ImportMTRegisteredUsersFile extends Command
+class Common extends Command
 {
     use WriteLockTrait;
 
     /**
-     * Пример: php artisan import:medtouch-helios --chunk=5 --timeout=60
      * @var string
      */
-    protected $signature = 'import:medtouch-reg-users
-                            {--chunk=5 : Размер чанка скачивания в MB}
-                            {--timeout=120 : Таймаут ожидания в секундах}
-                            {--need-file=false : Сохранять ли CSV файл}';
+    protected $signature = 'import:bitrix-mt';
 
     /**
-     * Описание команды.
      * @var string
      */
-    protected $description = 'Скачиваем большой файл CSV (Мед-тач) из Bitrix24 в приватное хранилище, пользователей и импортируем в БД';
+    protected $description = 'Общий класс для команд импорта кампаний';
 
     /**
      * Безопасный буфер памяти (в байтах), оставляемый свободным при работе с большими файлами.
      * Используется для предотвращения переполнения памяти.
      * Назначил: 50 MB
      */
-    private const MEMORY_SAFETY_BUFFER = 50 * 1024 * 1024;
+    protected const MEMORY_SAFETY_BUFFER = 50 * 1024 * 1024;
 
     /**
      * Максимально допустимая доля использования доступной памяти (от 0 до 1).
      * При превышении этого значения генерируется предупреждение.
      * Назначил: 0.8 (80% от доступной памяти)
      */
-    private const MAX_MEMORY_USAGE = 0.8;
+    protected const MAX_MEMORY_USAGE = 0.8;
 
     /**
-     * Имя csv файла для сохранения экспортированных данных.
+     * Имя csv файла для сохранения.
      */
-    private const TARGET_FILENAME = 'registered-users.csv';
+    protected string $TARGET_FILENAME = 'common.csv';
 
     /**
      * Путь для хранения экспортированных файлов относительно корня storage.
      * Используем приватную директорию.
      */
-    private const STORAGE_PATH = 'private/';
+    protected const STORAGE_PATH = 'private/';
 
     /**
      * Путь для сохранения скриншотов ошибок относительно корня storage.
      * Используется для диагностики проблем при работе с браузером.
      */
-    private const SCREENSHOT_PATH = 'logs/panther_screenshots/';
+    protected const SCREENSHOT_PATH = 'logs/panther_screenshots/';
 
     /**
      * Путь для сохранения HTML-дампов страниц при ошибках относительно корня storage.
      * Используется для анализа структуры страниц при проблемах с парсингом.
      */
-    private const HTML_DUMP_PATH = 'logs/panther_html/';
+    protected const HTML_DUMP_PATH = 'logs/panther_html/';
+
+    /**
+     * Колличество в пакете
+     */
+    protected const BATCH_SIZE = 500;
 
     /**
      * Путь к временному файлу
      * @var string|bool
      */
-    private string|bool $tmpFilePath;
+    protected string|bool $tmpFilePath;
 
+    protected bool $isTest;
+    protected bool $timeout;
 
     public function __construct()
     {
@@ -95,46 +95,8 @@ class ImportMTRegisteredUsersFile extends Command
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
-    }
 
-    /**
-     * Организуем процесс скачивания файла с страницы Медтач гелиос.
-     * @return int
-     */
-    public function handle(): int
-    {
-        $client = $this->initBrowser();
-        try {
-            $this->logMemory('Начало выполнения');
-            $fileUrl = $this->getTargetUrl();
-            $this->info("Используется URL: " . $fileUrl);
-            $downloadUrl = $this->extractDownloadUrl($client, $fileUrl);
-            $this->info("URL для скачивания: " . $downloadUrl);
-
-            //скачиваем файл
-            $this->downloadCsv($downloadUrl);
-            //обрабатываем CSV
-            $this->processCsv();
-
-            //сохраняем файл если нужно
-            if ($this->option('need-file') === 'true') {
-                $this->saveToStorage();
-                $this->info("Файл успешно сохранён: " . $this->getFullStoragePath());
-            }
-
-            $this->logMemory('Завершение выполнения');
-            return CommandAlias::SUCCESS;
-        } catch (\Exception $e) {
-            CustomLog::errorLog(__CLASS__, 'commands', $e);
-            $this->error('Ошибка выполнения, смотрите логи');
-            return CommandAlias::FAILURE;
-        } finally {
-            //убедимся, что временный файл удален даже в случае ошибки
-            if (isset($this->tmpFilePath) && file_exists($this->tmpFilePath)) {
-                unlink($this->tmpFilePath);
-            }
-            $client->quit();
-        }
+        $this->isTest = env('APP_ENV') !== 'production';
     }
 
     /**
@@ -142,11 +104,9 @@ class ImportMTRegisteredUsersFile extends Command
      * Настраиваем параметры Chrome и случайный User-Agent.
      * @return Client
      */
-    private function initBrowser(): Client
+    protected function initBrowser(): Client
     {
         $this->info("Инициализация headless браузера...");
-
-        $isLocal = env('APP_ENV') !== 'production';
 
         $options = [
             '--headless=new',
@@ -156,7 +116,7 @@ class ImportMTRegisteredUsersFile extends Command
             '--disable-gpu',
         ];
 
-        if (!$isLocal) {
+        if (!$this->isTest) {
             $profileDir = '/tmp/chrome-profile-'.md5(microtime());
             if (!file_exists($profileDir)) {
                 mkdir($profileDir, 0755, true);
@@ -180,64 +140,10 @@ class ImportMTRegisteredUsersFile extends Command
         try {
             return Client::createChromeClient(null, $options);
         }  finally {
-            if (!$isLocal) {
+            if (!$this->isTest) {
                 array_map('unlink', glob("$profileDir/*"));
                 @rmdir($profileDir);
             }
-        }
-    }
-
-    /**
-     * Получаем URL для экспорта из переменных окружения.
-     * @return string
-     * @throws \Exception
-     */
-    private function getTargetUrl(): string
-    {
-        $url = env('BITRIX_MEDTOUCH_SCRIPT_URL_2');
-        if (empty($url)) {
-            throw new \Exception("BITRIX_MEDTOUCH_SCRIPT_URL_2 не указан в .env");
-        }
-        return $url;
-    }
-
-    /**
-     * Извлекаем URL для скачивания файла со страницы Bitrix.
-     * Используем несколько стратегий поиска ссылки.
-     * @param Client $client
-     * @param string $pageUrl URL страницы экспорта
-     * @return string
-     * @throws \Exception
-     */
-    private function extractDownloadUrl(Client $client, string $pageUrl): string
-    {
-        $this->info("Загрузка страницы для получения ссылки...");
-        $client->request('GET', $pageUrl);
-
-        try {
-            //ждём пока скрипт сформирует html с ссылкой
-            $client->waitFor('body', $this->option('timeout'));
-
-            //проверяем на ошибки
-            if ($client->getCrawler()->filter('.error, .exception')->count() > 0) {
-                $error = $client->getCrawler()->filter('.error, .exception')->first()->text();
-                throw new \Exception("Ошибка на странице: " . $error);
-            }
-
-            //получаем ссылку
-            $link = $this->waitForDownloadLink($client);
-
-            //делаем ссылку абсолютной
-            if (!parse_url($link, PHP_URL_SCHEME)) {
-                $baseUrl = parse_url($pageUrl, PHP_URL_SCHEME) . '://' . parse_url($pageUrl, PHP_URL_HOST);
-                $link = rtrim($baseUrl, '/') . '/' . ltrim($link, '/');
-            }
-
-            return $link;
-
-        } catch (\Exception $e) {
-            $this->saveDebugInfo($client);
-            throw new \Exception("Не удалось найти ссылку для скачивания: " . $e->getMessage());
         }
     }
 
@@ -249,16 +155,15 @@ class ImportMTRegisteredUsersFile extends Command
      * @return string
      * @throws \Exception
      */
-    private function waitForDownloadLink(Client $client): string
+    protected function waitForDownloadLink(Client $client): string
     {
         $startTime = time();
-        $timeout = $this->option('timeout');
         $selectors = [
             'a[download]',
             'a[href$=".csv"]',
         ];
 
-        while (time() - $startTime < $timeout) {
+        while (time() - $startTime < $this->timeout) {
             foreach ($selectors as $selector) {
                 try {
                     $client->waitForVisibility($selector, 5);
@@ -286,25 +191,32 @@ class ImportMTRegisteredUsersFile extends Command
     }
 
     /**
-     * Сохраняем отладочную информацию (скриншот, HTML) при ошибках.
+     * Сохраняем отладочную информацию (скриншот, HTML)
      * @param Client $client
+     * @param string $nameFile
+     * @param bool $withHtml
      */
-    private function saveDebugInfo(Client $client): void
+    protected function saveDebugInfo(Client $client, string $nameFile, bool $withHtml = true): void
     {
         try {
             $timestamp = time();
 
             //скриншот
-            $screenshot = self::SCREENSHOT_PATH . "error_ru_{$timestamp}.png";
+            $screenshot = self::SCREENSHOT_PATH . "{$nameFile}_{$timestamp}.png";
             $client->takeScreenshot(storage_path('app/' . $screenshot));
 
-            //html
-            $html = self::HTML_DUMP_PATH . "page_ru_{$timestamp}.html";
-            Storage::put($html, $client->getCrawler()->html());
+            if ($withHtml) {
+                //html
+                $html = self::HTML_DUMP_PATH . "page_ru_{$timestamp}.html";
+                Storage::put($html, $client->getCrawler()->html());
+            }
 
             $this->error("Отладочная информация сохранена:");
             $this->error("- Скриншот: storage/app/{$screenshot}");
-            $this->error("- HTML: storage/app/{$html}");
+
+            if ($withHtml) {
+                $this->error("- HTML: storage/app/{$html}");
+            }
 
         } catch (\Exception $e) {
             $this->error("Не удалось сохранить отладочную информацию: " . $e->getMessage());
@@ -315,11 +227,11 @@ class ImportMTRegisteredUsersFile extends Command
      * @param string $downloadUrl
      * @throws \Exception
      */
-    private function downloadCsv(string $downloadUrl): void
+    protected function downloadCsv(string $downloadUrl): void
     {
         $this->info("Начало скачивания файла...");
         $this->logMemory('Перед скачиванием');
-        $this->tmpFilePath = tempnam(sys_get_temp_dir(), 'medtouth_temp_');
+
         if ($this->tmpFilePath === false) {
             throw new \Exception('Не удалось создать временный файл');
         }
@@ -348,64 +260,13 @@ class ImportMTRegisteredUsersFile extends Command
     }
 
     /**
-     * Орабатываем данные и запичываем в БД активность пользователей
-     * @throws \Exception
-     */
-    private function processCsv(): void
-    {
-        $handle = fopen($this->tmpFilePath, 'r');
-        if (!$handle) {
-            throw new \Exception("Не удалось открыть CSV файл");
-        }
-
-        $currentUser = null;
-        $batchSize = 1000;
-        $validActivityTypes = ['Лонгрид', 'Мероприятие', 'Видеовизит', 'Квиз'];
-        $actionsToInsert = [];
-        $countBatchInsert = 0;
-
-        try {
-            while (($row = fgetcsv($handle, 0, ";")) !== FALSE) {
-                dd($row);
-                //проверяем строку с данными пользователя
-//                if (strpos($row[0], 'ID пользователя') === 0) {
-//                    if (preg_match('/ID пользователя:\s*(\d+)\s*,\s*e-mail пользователя:\s*(.+)/', $row[0], $matches)) {
-//                        $userBitrixId = $matches[1];
-//                        $email = trim($matches[2]);
-//                        $currentUser = $this->withTableLock('users_mt', function () use ($email) {
-//                            return UserMT::firstOrCreate(
-//                                ['email' => $email],
-//                                ['email' => $email]
-//                            );
-//                        });
-//                        $this->withTableLock('common_database', function () use ($email, $currentUser) {
-//                            CommonDatabase::updateOrCreate(
-//                                ['email' => $email],
-//                                ['email' => $email, 'mt_user_id' => $currentUser->id]
-//                            );
-//                        });
-//                    } else {
-//                        Log::warning("Некорректная строка с пользователем: " . json_encode($row));
-//                        $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
-//                    }
-//                    continue;
-//                }
-            }
-        } finally {
-            fclose($handle);
-        }
-
-        $this->info("Обработка CSV завершена.");
-    }
-
-    /**
      * Парсит дату из строки в формате 'd.m.Y H:i:s'.
      * Если дата некорректна, возвращает значение по умолчанию ('1970-01-01 00:00:00').
      * Значение по умолчанию - заглушка, чтобы при пакетном сохранении общий уникальный индекс не менял значение (такое происходит, если будет присвоено null)
      * @param string|null $dateString
      * @return string
      */
-    private function parseDateTime(?string $dateString): string
+    protected function parseDateTime(?string $dateString): string
     {
         $default = '1970-01-01 00:00:00';
         if (empty($dateString)) {
@@ -419,28 +280,10 @@ class ImportMTRegisteredUsersFile extends Command
         }
     }
 
-
-    /**
-     * Сохраняем временный файл в постоянное хранилище.
-     */
-    private function saveToStorage(): void
-    {
-        $this->info("Сохранение файла в хранилище...");
-
-        if (!Storage::exists(self::STORAGE_PATH)) {
-            Storage::makeDirectory(self::STORAGE_PATH);
-        }
-
-        Storage::put(
-            self::STORAGE_PATH . self::TARGET_FILENAME,
-            fopen($this->tmpFilePath, 'r')
-        );
-    }
-
     /**
      * Проверяем использование памяти и выводим предупреждения.
      */
-    private function checkMemoryUsage(): void
+    protected function checkMemoryUsage(): void
     {
         $usedMemory = memory_get_usage(true);
         $memoryLimit = $this->getMemoryLimit();
@@ -463,7 +306,7 @@ class ImportMTRegisteredUsersFile extends Command
      * Логируем текущее использование памяти.
      * @param string $message
      */
-    private function logMemory(string $message): void
+    protected function logMemory(string $message): void
     {
         $used = memory_get_usage(true);
         $peak = memory_get_peak_usage(true);
@@ -480,19 +323,10 @@ class ImportMTRegisteredUsersFile extends Command
     }
 
     /**
-     * Возвращаем полный путь к сохраненному файлу.
-     * @return string
-     */
-    private function getFullStoragePath(): string
-    {
-        return storage_path('app/' . self::STORAGE_PATH . self::TARGET_FILENAME);
-    }
-
-    /**
      * Получаем лимит памяти в байтах.
      * @return int
      */
-    private function getMemoryLimit(): int
+    protected function getMemoryLimit(): int
     {
         $limit = ini_get('memory_limit');
         if (preg_match('/^(\d+)(.)$/', $limit, $matches)) {
@@ -512,12 +346,38 @@ class ImportMTRegisteredUsersFile extends Command
      * @param int $bytes Размер в байтах
      * @return string
      */
-    private function formatBytes(int $bytes): string
+    protected function formatBytes(int $bytes): string
     {
         $units = ['B', 'KB', 'MB', 'GB'];
         for ($i = 0; $bytes >= 1024 && $i < 3; $i++) {
             $bytes /= 1024;
         }
         return round($bytes, 2) . ' ' . $units[$i];
+    }
+
+    /**
+     * Сохраняем временный файл в постоянное хранилище.
+     */
+    protected function saveToStorage(): void
+    {
+        $this->info("Сохранение файла в хранилище...");
+
+        if (!Storage::exists(self::STORAGE_PATH)) {
+            Storage::makeDirectory(self::STORAGE_PATH);
+        }
+
+        Storage::put(
+            self::STORAGE_PATH . $this->TARGET_FILENAME,
+            fopen($this->tmpFilePath, 'r')
+        );
+    }
+
+    /**
+     * Возвращаем полный путь к сохраненному файлу.
+     * @return string
+     */
+    protected function getFullStoragePath(): string
+    {
+        return storage_path('app/' . self::STORAGE_PATH . $this->TARGET_FILENAME);
     }
 }
