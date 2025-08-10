@@ -48,11 +48,11 @@ class Kernel extends ConsoleKernel
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
         $schedule->command('import:new-mt-users')
-            ->dailyAt('20:44')
+            ->dailyAt('00:10')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
         $schedule->command('import:new-mt-touches')
-            ->dailyAt('20:49')
+            ->dailyAt('00:20')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
 //        $schedule->command('import:id-campaigns')
@@ -60,11 +60,11 @@ class Kernel extends ConsoleKernel
 //            ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
 
         $schedule->command('import:sendsay-stats')
-            ->dailyAt('20:59')
+            ->dailyAt('00:40')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
         $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->dailyAt('22:55')
+            ->dailyAt('01:30')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
             ->then(function () use ($commonPath) {
                 //создаём и запускаем команду вручную с ожиданием, пока не отработает первая,
