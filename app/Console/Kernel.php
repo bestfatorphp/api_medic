@@ -91,7 +91,7 @@ class Kernel extends ConsoleKernel
                 );
 
                 if ($exitCode !== 0) {
-                    Log::error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
+                    Log::channel('commands')->error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
                 }
             });
 
