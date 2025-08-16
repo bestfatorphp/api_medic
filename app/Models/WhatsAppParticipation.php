@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property integer        $campaign_id            ID WhatsApp рассылки
  * @property string         $phone                  Телефон
  * @property Carbon         $send_date              Время отправки
+ * @property Carbon         $delivered_at           Время доставки
+ * @property Carbon         $opened_at              Время открытия
  */
 class WhatsAppParticipation extends Model
 {
@@ -31,7 +33,9 @@ class WhatsAppParticipation extends Model
         'id',
         'campaign_id',
         'phone',
-        'send_date'
+        'send_date',
+        'delivered_at',
+        'opened_at',
     ];
 
     protected $with = [

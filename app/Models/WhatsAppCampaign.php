@@ -14,6 +14,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property string         $id
  * @property string         $campaign_name          Наименоание рассылки
  * @property Carbon         $send_date              Время отправки
+ * @property integer        $sent                   Количество отправленных
+ * @property integer        $delivered              Количество доставленных
+ * @property float          $delivery_rate          Скорость доставки
+ * @property integer        $opened                 Количество открытий
+ * @property float          $open_rate              Открытия в процентах
  *
  */
 class WhatsAppCampaign extends Model

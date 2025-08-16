@@ -31,7 +31,7 @@ class Kernel extends ConsoleKernel
 
         //import:medtouch-helios --chunk=5 --timeout=120 --need-file=true (отработала)
 
-        //import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true
+        //import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true (отработала)
 
         //import:id-campaigns (ПРОВЕРИТЬ!!!)
 

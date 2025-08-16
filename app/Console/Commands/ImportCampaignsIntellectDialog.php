@@ -59,6 +59,7 @@ class ImportCampaignsIntellectDialog extends Command
 
         try {
             $this->processAllCampaigns($fromDate);
+            $this->getActualStatsIssues();
             $this->info('Сбор статистики завершен успешно');
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
@@ -209,6 +210,8 @@ class ImportCampaignsIntellectDialog extends Command
         $participationBatch[] = [
             'campaign_id' => $campaignId,
             'phone' => $message['person_phone'],
+            'delivered_at' => $message['delivered_at'],
+            'opened_at' => $message['viewed_at'],
             'send_date' => $message['created_at'],
         ];
     }
@@ -261,5 +264,87 @@ class ImportCampaignsIntellectDialog extends Command
             $this->error("Ошибка при сохранении данных: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Актуализируем согласно собранным
+     */
+    private function getActualStatsIssues()
+    {
+        $issues = WhatsAppCampaign::query()
+            ->select(['id'])
+            ->get();
+
+        foreach ($issues as $issue) {
+            $stats = $this->getActualStats($issue->id);
+            $this->updateIssueStats($issue, $stats);
+        }
+    }
+
+    /**
+     * Считаем click и read
+     * @param int $issueId
+     * @return array
+     */
+    private function getActualStats(int $issueId): array
+    {
+        return [
+            'sent' => WhatsAppParticipation::query()
+                ->where('campaign_id', $issueId)
+                ->whereNotNull('send_date')
+                ->count(),
+
+            'delivered' => WhatsAppParticipation::query()
+                ->where('campaign_id', $issueId)
+                ->whereNotNull('delivered_at')
+                ->count(),
+
+            'opened' => WhatsAppParticipation::query()
+                ->where('campaign_id', $issueId)
+                ->whereNotNull('opened_at')
+                ->count(),
+        ];
+    }
+
+    /**
+     * Обновляем запись рассылки
+     * @param WhatsAppCampaign $issue
+     * @param array $stats
+     */
+    private function updateIssueStats(WhatsAppCampaign $issue, array $stats): void
+    {
+        $sent = $stats['sent'];
+        $delivered = $stats['delivered'];
+        $opened = $stats['opened'];
+
+        $issue->update([
+            'sent' => $sent,
+            'delivered' => $delivered,
+            'delivery_rate' => $this->calculateRate($sent, $delivered),
+            'opened' => $opened,
+            'open_rate' => $this->calculateRate($delivered, $opened),
+        ]);
+    }
+
+    /**
+     * Рассчитывает процент
+     * @param int $total Общее количество
+     * @param int $countSuccess Количество успешных
+     *
+     * @return float Процент доставки (0-100)
+     */
+    private function calculateRate(int $total, int $countSuccess): float
+    {
+        if ($total <= 0) {
+            return 0.0;
+        }
+
+        $rate = ($countSuccess / $total) * 100;
+
+        if ($rate > 100) {
+            $rate = 100;
+        }
+
+        return round($rate, 2);
     }
 }

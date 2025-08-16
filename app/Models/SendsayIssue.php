@@ -15,11 +15,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property integer        $id
  * @property string         $issue_name             Наименоание рассылки
  * @property Carbon         $send_date              Дата отправки
- * @property float          $open_rate              Открытая ставка
+ * @property float          $open_rate              Открытия в процентах
  * @property float          $ctr                    Сtr
  * @property integer        $sent                   Количество отправленных
  * @property integer        $delivered              Количество доставленных
- * @property float          $delivery_rate          Скорость доставки
+ * @property float          $delivery_rate          Доставлено в процентах
  * @property integer        $opened                 Количество открытий
  * @property integer        $open_per_unique        Количество уникальных открытий
  * @property integer        $clicked                Количество кликов
