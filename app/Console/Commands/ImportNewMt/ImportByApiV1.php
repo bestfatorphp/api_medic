@@ -767,7 +767,7 @@ class ImportByApiV1 extends Common
 
                     $activity = ActivityMT::firstOrCreate(
                         [
-                            'type' => 'Квиз',
+                            'type' => str_contains($group->name, 'Longread') ? 'Лонгрид' : 'Квиз',
                             'name' => $group->name
                         ],
                         [
