@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\MutatorsHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Врачи
@@ -37,11 +38,87 @@ class Doctor extends Model
 
     /**
      * Общая база
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * @return HasOne
      */
-    public function common_database()
+    public function common_database(): HasOne
     {
         return $this->hasOne(CommonDatabase::class, 'email', 'email');
+    }
+
+    /**
+     * Мутатор для email
+     */
+    public function setEmailAttribute($value)
+    {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['email'] ?? null)) {
+            $this->attributes['email'] = $value;
+        }
+    }
+
+    /**
+     * Мутатор для full_name
+     */
+    public function setFullNameAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['full_name'] ?? null)) {
+            $this->attributes['full_name'] = $this->toUpperCase(
+                $value,
+                $this->attributes['full_name'] ?? null
+            );
+        }
+    }
+
+    /**
+     * Мутатор для city
+     */
+    public function setCityAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['city'] ?? null)) {
+            $this->attributes['city'] = $this->toUpperCase(
+                $value,
+                $this->attributes['city'] ?? null
+            );
+        }
+    }
+
+    /**
+     * Мутатор для region
+     */
+    public function setRegionAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['region'] ?? null)) {
+            $this->attributes['region'] = $this->toUpperCase(
+                $value,
+                $this->attributes['region'] ?? null
+            );
+        }
+    }
+
+
+    /**
+     * Мутатор для country
+     */
+    public function setCountryAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['country'] ?? null)) {
+            $this->attributes['country'] = $this->toUpperCase(
+                $value,
+                $this->attributes['country'] ?? null
+            );
+        }
+    }
+
+    /**
+     * Мутатор для specialty
+     */
+    public function setSpecialtyAttribute($value)
+    {
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['specialty'] ?? null)) {
+            $this->attributes['specialty'] = $this->toUpperCase(
+                $value,
+                $this->attributes['specialty'] ?? null
+            );
+        }
     }
 
     /**
@@ -49,7 +126,10 @@ class Doctor extends Model
      */
     public function setPhoneAttribute($value)
     {
-        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
+        $value = $value ? preg_replace('/[^0-9]/', '', $value) : null;
+        if ($this->shouldUpdateFieldByLength($value, $this->attributes['phone'] ?? null)) {
+            $this->attributes['phone'] = $value;
+        }
     }
 
 }

@@ -4,6 +4,7 @@ namespace App\Console\Commands\ImportNewMt;
 
 use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
+use App\Models\Doctor;
 use App\Models\ProjectMT;
 use App\Models\ProjectTouchMT;
 use App\Models\UserMT;
@@ -22,7 +23,7 @@ class ImportByApiV2 extends Common
 
     protected $signature = 'import:new-mt-touches
                             {--updated_after= : Дата последнего обновления в формате d.m.Y}
-                            {--pageSize=200 : Колличество записей за один запрос}';
+                            {--pageSize=100 : Колличество записей за один запрос}';
 
     protected $description = 'Импорт касаний нового сайта МедТач, в ограниченной памяти';
 
@@ -47,7 +48,7 @@ class ImportByApiV2 extends Common
     {
         $updatedAfter = $this->option('updated_after');
         $queryParams = [
-            'exclude_subobjects' => ['contact'],
+            'exclude_subobjects' => [],
             'updated_after' => $updatedAfter
                 ? Carbon::parse($updatedAfter)->startOfDay()->format('Y-m-d H:i:s.v')
                 : Carbon::now()->subDay()->startOfDay()->format('Y-m-d H:i:s.v'),
@@ -85,7 +86,11 @@ class ImportByApiV2 extends Common
         $commonDBBatch = [];
         $projectsBatch = [];
         $touchesBatch = [];
+        $doctorsBatch = [];
+        $usersMTDoctorsBatch = [];
+        $commonDBDoctorsBatch = [];
         $processedEmails = [];
+        $processedDoctorsEmails = [];
         $processedProjectKeys = [];
 
         try {
@@ -102,11 +107,17 @@ class ImportByApiV2 extends Common
                     //обработка данных пользователя
                     $this->processUserData($touchData, $usersMTBatch, $commonDBBatch, $processedEmails);
 
+                    $contact = null;
+                    if (!empty($contact = $touchData['contact'])) {
+                        $contact['specialty'] = $touchData['speciality_name'];
+                        $this->processDoctorsData($contact, $doctorsBatch, $usersMTDoctorsBatch, $commonDBDoctorsBatch, $processedDoctorsEmails);
+                    }
+
                     //обработка проекта
                     $this->processProjectData($touchData, $projectsBatch, $processedProjectKeys);
 
                     //подготовка касания
-                    $touchesBatch[] = $this->prepareTouchData($touchData, $this->getProjectKey($touchData['project'], $touchData['wave']));
+                    $touchesBatch[] = $this->prepareTouchData($touchData, $this->getProjectKey($touchData['project'], $touchData['wave']), $contact);
 
                     $totalProcessed++;
 
@@ -116,9 +127,13 @@ class ImportByApiV2 extends Common
                         $this->processBatchInsert(
                             $usersMTBatch,
                             $commonDBBatch,
+                            $doctorsBatch,
+                            $usersMTDoctorsBatch,
+                            $commonDBDoctorsBatch,
                             $projectsBatch,
                             $touchesBatch,
                             $processedEmails,
+                            $processedDoctorsEmails,
                             $processedProjectKeys,
                             $totalProcessed,
                             $countBatchInsert
@@ -136,9 +151,13 @@ class ImportByApiV2 extends Common
                 $this->processBatchInsert(
                     $usersMTBatch,
                     $commonDBBatch,
+                    $doctorsBatch,
+                    $usersMTDoctorsBatch,
+                    $commonDBDoctorsBatch,
                     $projectsBatch,
                     $touchesBatch,
                     $processedEmails,
+                    $processedDoctorsEmails,
                     $processedProjectKeys,
                     $totalProcessed,
                     $countBatchInsert,
@@ -178,6 +197,19 @@ class ImportByApiV2 extends Common
         }
     }
 
+    private function processDoctorsData(array $contact, array &$doctorsBatch, array &$usersMTDoctorBatch, array &$commonDBDoctorBatch, array &$processedDoctorsEmails): void
+    {
+        $email = $contact['email'];
+
+        if (!in_array($email, $processedDoctorsEmails)) {
+            $fullName = $contact['name'];
+            $doctorsBatch[] = $this->prepareDoctorsData($contact, $fullName);
+            $usersMTDoctorBatch[] = $this->prepareMtUserData($contact, $fullName);
+            $commonDBDoctorBatch[] = $this->prepareCommonDBData($contact, $fullName);
+            $processedDoctorsEmails[] = $email;
+        }
+    }
+
     /**
      * Обработка данных проекта
      * @param array $touchData                  Данные касания
@@ -198,22 +230,30 @@ class ImportByApiV2 extends Common
 
     /**
      * Обработка пакетной вставки данных
-     * @param array $usersMTBatch           Массив пользователей для users_mt
-     * @param array $commonDBBatch          Массив пользователей для common_database
-     * @param array $projectsBatch          Массив проектов
-     * @param array $touchesBatch           Массив касаний
-     * @param array $processedEmails        Массив обработанных email
-     * @param array $processedProjectKeys   Массив обработанных ключей проектов
-     * @param int $totalProcessed           Общее количество обработанных записей
-     * @param int $countBatchInsert         Счетчик пакетных вставок
-     * @param bool $isFinal                 Флаг финальной вставки
+     * @param array $usersMTBatch                   Массив пользователей для users_mt
+     * @param array $commonDBBatch                  Массив пользователей для common_database
+     * @param array $doctorsBatch                   Массив докторов
+     * @param array $usersMTDoctorsBatch            Массив докторов для users_mt
+     * @param array $commonDBDoctorsBatch           Массив докторов для common_database
+     * @param array $projectsBatch                  Массив проектов
+     * @param array $touchesBatch                   Массив касаний
+     * @param array $processedEmails                Массив обработанных email пользователей
+     * @param array $processedDoctorsEmails         Массив обработанных email докторов
+     * @param array $processedProjectKeys           Массив обработанных ключей проектов
+     * @param int $totalProcessed                   Общее количество обработанных записей
+     * @param int $countBatchInsert                 Счетчик пакетных вставок
+     * @param bool $isFinal                         Флаг финальной вставки
      */
     private function processBatchInsert(
         array &$usersMTBatch,
         array &$commonDBBatch,
+        array &$doctorsBatch,
+        array &$usersMTDoctorsBatch,
+        array &$commonDBDoctorsBatch,
         array &$projectsBatch,
         array &$touchesBatch,
         array &$processedEmails,
+        array &$processedDoctorsEmails,
         array &$processedProjectKeys,
         int $totalProcessed,
         int &$countBatchInsert,
@@ -225,15 +265,22 @@ class ImportByApiV2 extends Common
         $this->insertBatchData(
             $usersMTBatch,
             $commonDBBatch,
+            $doctorsBatch,
+            $usersMTDoctorsBatch,
+            $commonDBDoctorsBatch,
             $projectsBatch,
             $touchesBatch
         );
 
         $usersMTBatch = [];
         $commonDBBatch = [];
+        $doctorsBatch = [];
+        $usersMTDoctorsBatch = [];
+        $commonDBDoctorsBatch = [];
         $projectsBatch = [];
         $touchesBatch = [];
         $processedEmails = [];
+        $processedDoctorsEmails = [];
         $processedProjectKeys = [];
 
         gc_mem_caches();
@@ -241,20 +288,29 @@ class ImportByApiV2 extends Common
 
     /**
      * Пакетная вставка
-     * @param array $usersMTBatch       Массив пользователей для users_mt
-     * @param array $commonDBBatch      Массив пользователей для common_database
-     * @param array $projectsBatch      Массив проектов
-     * @param array $touchesBatch       Массив касаний
+     * @param array $usersMTBatch               Массив пользователей для users_mt
+     * @param array $commonDBBatch              Массив пользователей для common_database
+     * @param array $doctorsBatch               Массив докторов
+     * @param array $usersMTDoctorsBatch        Массив докторов для users_mt
+     * @param array $commonDBDoctorsBatch       Массив докторов для common_database
+     * @param array $projectsBatch              Массив проектов
+     * @param array $touchesBatch               Массив касаний
      */
     private function insertBatchData(
         array $usersMTBatch,
         array $commonDBBatch,
+        array $doctorsBatch,
+        array $usersMTDoctorsBatch,
+        array $commonDBDoctorsBatch,
         array $projectsBatch,
         array $touchesBatch
     ): void {
-        DB::transaction(function () use ($usersMTBatch, $commonDBBatch, $projectsBatch, $touchesBatch) {
+        DB::transaction(function () use ($usersMTBatch, $commonDBBatch, $doctorsBatch, $usersMTDoctorsBatch, $commonDBDoctorsBatch, $projectsBatch, $touchesBatch) {
             //вставка пользователей в users_mt
             $this->processUsersInsert($usersMTBatch, $commonDBBatch);
+
+            //вставка докторов в users_mt
+            $this->processUsersInsert($usersMTDoctorsBatch, $commonDBDoctorsBatch, true);
 
             //вставка проектов и получение их ID
             $projectIdMap = $this->processProjectsInsert($projectsBatch);
@@ -265,8 +321,14 @@ class ImportByApiV2 extends Common
             //вставка пользователей в common_database
             $this->processCommonDatabaseInsert($commonDBBatch);
 
+            //вставка докторов в common_database
+            $this->processCommonDatabaseInsert($commonDBDoctorsBatch, true);
+
             //вставка касаний
             $this->processTouchesInsert($touchesBatch);
+
+            //вставка врачей
+            $this->processDoctorsInsert($doctorsBatch);
         });
     }
 
@@ -275,14 +337,18 @@ class ImportByApiV2 extends Common
      * @param array $usersMTBatch Массив пользователей
      * @param array $commonDBBatch Ссылка на массив для common_database
      */
-    private function processUsersInsert(array $usersMTBatch, array &$commonDBBatch): void
+    private function processUsersInsert(array $usersMTBatch, array &$commonDBBatch, bool $isDoctors = false): void
     {
         if (!empty($usersMTBatch)) {
-            $this->withTableLock('users_mt', function () use ($usersMTBatch) {
+            $this->withTableLock('users_mt', function () use ($usersMTBatch, $isDoctors) {
+                $updateFields = ['full_name', 'email'];
+                if (!$isDoctors) {
+                    $updateFields[] = 'phone';
+                }
                 UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
-                    ['full_name', 'email', 'phone']
+                    $updateFields
                 );
             });
 
@@ -353,14 +419,35 @@ class ImportByApiV2 extends Common
      * Вставка пользователей в common_database
      * @param array $commonDBBatch      Массив пользователей
      */
-    private function processCommonDatabaseInsert(array $commonDBBatch): void
+    private function processCommonDatabaseInsert(array $commonDBBatch, bool $isDoctors = false): void
     {
         if (!empty($commonDBBatch)) {
-            $this->withTableLock('common_database', function () use ($commonDBBatch) {
+            $this->withTableLock('common_database', function () use ($commonDBBatch, $isDoctors) {
+                $updateFields = ['full_name', 'email'];
+                if (!$isDoctors) {
+                    $updateFields[] = 'phone';
+                }
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'email', 'phone']
+                    $updateFields
+                );
+            });
+        }
+    }
+
+    /**
+     * Вставка врачей
+     * @param array $doctorsBatch
+     */
+    private function processDoctorsInsert(array $doctorsBatch): void
+    {
+        if (!empty($doctorsBatch)) {
+            $this->withTableLock('doctors', function () use ($doctorsBatch) {
+                Doctor::upsertWithMutators(
+                    $doctorsBatch,
+                    ['email'],
+                    ['full_name', 'specialty', 'phone']
                 );
             });
         }
@@ -391,7 +478,11 @@ class ImportByApiV2 extends Common
                         'project_id' => $projectId,
                         'touch_type' => $touch['touch_type'],
                         'status' => $touch['status'],
-                        'date_time' => $touch['date_time']
+                        'date_time' => $touch['date_time'],
+                        'contact_verified' => $touch['contact_verified'],
+                        'contact_allowed' => $touch['contact_allowed'],
+                        'contact_created_at' => $touch['contact_created_at'],
+                        'contact_email' => $touch['contact_email'],
                     ];
                 }
             }
@@ -461,6 +552,23 @@ class ImportByApiV2 extends Common
     }
 
     /**
+     * Подготовка данных врача
+     * @param array $contact
+     * @param string $fullName
+     * @return array
+     */
+    #[ArrayShape(['full_name' => "string", 'email' => "mixed", 'specialty' => "mixed", 'phone' => "mixed"])]
+    private function prepareDoctorsData(array $contact, string $fullName): array
+    {
+        return [
+            'full_name' => $fullName,
+            'email' => $contact['email'],
+            'specialty' => $contact['specialty'],
+            'phone' => $contact['phone'] ?? null,
+        ];
+    }
+
+    /**
      * Подготовка данных проекта для вставки
      * @param array $projectData    Данные проекта
      * @param array $waveData       Данные волны
@@ -479,19 +587,28 @@ class ImportByApiV2 extends Common
 
     /**
      * Подготовка данных касания для вставки
-     * @param array $touchData      Данные касания
-     * @param string $projectKey    Ключ проекта
+     * @param array $touchData          Данные касания
+     * @param string $projectKey        Ключ проекта
+     * @param array|null $contact            Данные врача
      * @return array
      */
     #[ArrayShape(['user_email' => "mixed", 'project_key' => "string", 'touch_type' => "mixed", 'status' => "mixed", 'date_time' => "string"])]
-    private function prepareTouchData(array $touchData, string $projectKey): array
+    private function prepareTouchData(array $touchData, string $projectKey, ?array $contact): array
     {
-        return [
+        $data = [
             'user_email' => $touchData['user']['email'],
             'project_key' => $projectKey,
             'touch_type' => $touchData['touch_type'],
             'status' => $touchData['success'],
             'date_time' => Carbon::parse($touchData['touch_date'])->format('Y-m-d H:i:s')
         ];
+        if ($contact) {
+            $data['contact_verified'] = $contact['verified'];
+            $data['contact_allowed'] = $contact['allowed'];
+            $data['contact_created_at'] = Carbon::parse($contact['created_at']);
+            $data['contact_email'] = $contact['email'];
+        }
+
+        return $data;
     }
 }
