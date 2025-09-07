@@ -253,6 +253,15 @@ class ImportCampaignsSandSay extends Command
         $skip = 0;
         $count = 0;
 
+        //забираем последнюю дату deliv, чтобы собрать от неё (статстика по deliv только до 22.07.2025)
+        if ($status === 'deliv.issue' && $this->withUpdate) {
+            $lastDeliv = SendsayParticipation::where('sendsay_key', $status)
+                ->latest('update_time')
+                ->value('update_time');
+
+            $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
+        }
+
         do {
             $this->info("Собираю $status - $count");
             //получаем clicked и read
@@ -334,12 +343,11 @@ class ImportCampaignsSandSay extends Command
                     if ($status === 'deliv.issue' && $this->withUpdate) {
                         collect($batchParticipations)->chunk(100)->each(function ($chunk) {
                             foreach ($chunk as $participation) {
-                                list($issueId, $email, $result, $updateTime, $key) = $participation;
                                 SendsayParticipation::query()->updateOrCreate(
                                     [
-                                        'issue_id' => $issueId,
-                                        'email' => $email,
-                                        'sendsay_key' => $key
+                                        'issue_id' => $participation['issue_id'],
+                                        'email' => $participation['email'],
+                                        'sendsay_key' => $participation['sendsay_key']
                                     ],
                                     $participation
                                 );
@@ -419,9 +427,6 @@ class ImportCampaignsSandSay extends Command
      */
     private function getParticipationsByDates(string $status, int $limit, int $skip = 0): array
     {
-        if ($status === 'deliv.issue' && $this->withUpdate) {
-            $this->fromDate = Carbon::now()->subDays(2)->format('Y-m-d');
-        }
         $from = $this->fromDate . ' 00:00:00';
         $to = $this->toDate . ' 23:59:59';
 
