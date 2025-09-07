@@ -236,8 +236,14 @@ trait MutatorsHelper
             return null;
         }
 
-        if (strlen($value) === 11 && str_starts_with($value, '8')) {
-            return '7' . substr($value, 1);
+        if (strlen($value) === 11) {
+            if (str_starts_with($value, '8')) {
+                return '7' . substr($value, 1);
+            } elseif (str_starts_with($value, '7')) {
+                return $value;
+            }
+        } elseif (strlen($value) === 10) {
+            return '7' . $value;
         }
 
         return null;
