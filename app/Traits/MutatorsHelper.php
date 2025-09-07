@@ -223,7 +223,7 @@ trait MutatorsHelper
     protected function parsePhone(?string $newValue, ?string $currentValue): ?string
     {
         if (empty($newValue) && empty($currentValue)) {
-            return '';
+            return null;
         }
 
         if ($currentValue && preg_match('/^7\d{10}$/', $currentValue)) {
@@ -233,7 +233,7 @@ trait MutatorsHelper
         $value = preg_replace('/[^\d]/', '', $newValue);
 
         if (empty($value)) {
-            return '';
+            return null;
         }
 
         if (strlen($value) === 11) {
@@ -246,6 +246,6 @@ trait MutatorsHelper
             return '7' . $value;
         }
 
-        return '';
+        return null;
     }
 }

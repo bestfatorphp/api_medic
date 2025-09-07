@@ -142,10 +142,10 @@ class ImportCampaignsSandSay extends Command
             $this->processParticipations($limit);
 
             $progressBar->finish();
-            $this->newLine();
-            $this->info("Обновляем рассылки, данными по {$this->toDate}");
 
             if (!$onlyDeliv) {
+                $this->newLine();
+                $this->info("Обновляем рассылки, данными по {$this->toDate}");
                 //обновляем данные
                 $this->getActualStatsIssues();
             }

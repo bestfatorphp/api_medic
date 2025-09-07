@@ -57,6 +57,6 @@ class WhatsAppContact extends Model
      */
     public function setPhoneAttribute($value)
     {
-        $this->attributes['phone'] = $this->parsePhone($value, $this->attributes['phone'] ?? null);
+        $this->attributes['phone'] = $value ? preg_replace('/[^0-9]/', '', $value) : null;
     }
 }
