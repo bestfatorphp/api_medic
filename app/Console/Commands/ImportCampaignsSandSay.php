@@ -31,6 +31,8 @@ class ImportCampaignsSandSay extends Command
      */
     protected $signature = 'import:sendsay-stats
                             {--from= : Начальная дата сбора clicks и read в формате DD.MM.YYYY}
+                            {--withUpdate=0}
+                            {--onlyDeliv=0}
                             {--limit=500 : Колличество записей за один запрос}
                             {--sleep=1 : Задержка между запросами}';
 
@@ -46,14 +48,28 @@ class ImportCampaignsSandSay extends Command
     private int $batchSize = 500;
 
     /**
+     * Собирать с даты
      * @var string
      */
     private string $fromDate;
 
     /**
+     * Собирать до даты
      * @var string
      */
     private string $toDate;
+
+    /**
+     * Обновлять ли участия доставки писем пользователям
+     * @var bool
+     */
+    private bool $withUpdate;
+
+    /**
+     * Статусы для получения участий
+     * @var array|string[]
+     */
+    private array $statuses = ['click', 'read', 'deliv.issue'];
 
     /**
      * Поля статистики, получаемые из API SendSay
@@ -100,22 +116,27 @@ class ImportCampaignsSandSay extends Command
             $progressBar = new ProgressBar($this->output, count($issues));
             $progressBar->start();
 
+            $onlyDeliv = (bool)$this->option('onlyDeliv');
             $limit = $options['limit'];
-            foreach ($issues as $issue) {
-                try {
-                    $this->processIssue($issue, $limit);
-                    $progressBar->advance();
-                    if ($options['sleep'] > 0) {
-                        sleep($options['sleep']);
+
+            if (!$onlyDeliv) {
+                foreach ($issues as $issue) {
+                    try {
+                        $this->processIssue($issue, $limit);
+                        $progressBar->advance();
+                        if ($options['sleep'] > 0) {
+                            sleep($options['sleep']);
+                        }
+                    } catch (\Exception $e) {
+                        Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
+                        $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                     }
-                } catch (\Exception $e) {
-                    Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
-                    $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                 }
+            } else {
+                $this->statuses = ['deliv.issue'];
             }
 
             $this->newLine();
-            $this->info('Собираю clicks и read');
 
             //собираем участия отдельно за дату от и до
             $this->processParticipations($limit);
@@ -124,8 +145,10 @@ class ImportCampaignsSandSay extends Command
             $this->newLine();
             $this->info("Обновляем рассылки, данными по {$this->toDate}");
 
-            //обновляем данные
-            $this->getActualStatsIssues();
+            if (!$onlyDeliv) {
+                //обновляем данные
+                $this->getActualStatsIssues();
+            }
 
             $this->newLine();
             $this->info("\nСбор статистики завершен успешно");
@@ -206,12 +229,15 @@ class ImportCampaignsSandSay extends Command
         }
     }
 
+    /**
+     * Получаем статистику по кликам, чтению и доставке писем
+     * @param int $limit
+     */
     private function processParticipations(int $limit)
     {
-        $statuses = ['click', 'read'/*, 'deliv'*/];
+
         $batchParticipations = [];
-        foreach ($statuses as $status) {
-            //получаем статистику по кликам и чтению письма
+        foreach ($this->statuses as $status) {
             $this->getParticipationsAndSave($status, $limit, $batchParticipations);
         }
     }
@@ -232,23 +258,31 @@ class ImportCampaignsSandSay extends Command
             //получаем clicked и read
             $participations = $this->getParticipationsByDates($status, $limit, $skip);
 
+            $statusesData = [
+                'click' => 'clicked',
+                'read' => 'read',
+                'deliv.issue' => 'delivered',
+            ];
+
             foreach ($participations as $participation) {
-                $isClick = $status === 'click';
-                $result = $isClick ? 'clicked' : 'read';
-                $indexTime = $isClick ? 3 : 2;
+                if ($status === 'deliv.issue' && (int)$participation[3] < 1) {
+                    $statusesData[$status] = 'not delivered';
+                }
+
+                $result = $statusesData[$status];
                 $email = $participation[0];
                 $issueId = (int)$participation[1];
-                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$indexTime]);
+                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$status === 'click' ? 3 : 2], $status);
 
                 // Принудительно сохраняем каждые N записей
                 if (count($batchParticipations) % 100 == 0) {
-                    $this->saveBatchDataParticipations($batchParticipations);
+                    $this->saveBatchDataParticipations($batchParticipations, $status);
                 }
             }
 
             // Сохраняем остатки после каждого запроса к API
             if (!empty($batchParticipations)) {
-                $this->saveBatchDataParticipations($batchParticipations);
+                $this->saveBatchDataParticipations($batchParticipations, $status);
             }
 
             $skip += $limit;
@@ -291,12 +325,30 @@ class ImportCampaignsSandSay extends Command
     /**
      * Пакетная вставка участий
      * @param array $batchParticipations
+     * @param string $status
      */
-    private function saveBatchDataParticipations(array &$batchParticipations): void
+    private function saveBatchDataParticipations(array &$batchParticipations, string $status): void
     {
         if (!empty($batchParticipations)) {
-                $this->withTableLock('sendsay_participation', function () use ($batchParticipations) {
-                    SendsayParticipation::insert($batchParticipations);
+                $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
+                    if ($status === 'deliv.issue' && $this->withUpdate) {
+                        collect($batchParticipations)->chunk(100)->each(function ($chunk) {
+                            foreach ($chunk as $participation) {
+                                list($issueId, $email, $result, $updateTime, $key) = $participation;
+                                SendsayParticipation::query()->updateOrCreate(
+                                    [
+                                        'issue_id' => $issueId,
+                                        'email' => $email,
+                                        'update_time' => $updateTime,
+                                        'sendsay_key' => $key
+                                    ],
+                                    $participation
+                                );
+                            }
+                        });
+                    } else {
+                        SendsayParticipation::insert($batchParticipations);
+                    }
                 });
 
             $batchParticipations = [];
@@ -368,6 +420,9 @@ class ImportCampaignsSandSay extends Command
      */
     private function getParticipationsByDates(string $status, int $limit, int $skip = 0): array
     {
+        if ($status === 'deliv.issue' && $this->withUpdate) {
+            $this->fromDate = Carbon::now()->subDays(2)->format('Y-m-d');
+        }
         $from = $this->fromDate . ' 00:00:00';
         $to = $this->toDate . ' 23:59:59';
 
@@ -386,12 +441,12 @@ class ImportCampaignsSandSay extends Command
                 ],
                 'filter' => $filter
             ],
-            'deliv' => [
+            'deliv.issue' => [
                 'select' => [               //доставка
                     "deliv.member.email",
                     "deliv.issue.id",
-                    "deliv.dt",
-                    "deliv.status"
+                    "deliv.issue.dt",
+                    "deliv.result"
                 ],
                 'filter' => $filter
             ],
@@ -459,16 +514,18 @@ class ImportCampaignsSandSay extends Command
      * @param string $email
      * @param string $result
      * @param string|null $time
+     * @param string $sendSayKey
      * @return array
      */
-    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null"])]
-    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null): array
+    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null", "sendsay_key" => "string"])]
+    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null, string $sendSayKey): array
     {
         return [
             'issue_id' => $issueId,
             'email' => $email,
             'result' => $result,
             'update_time' => !empty($time) ? Carbon::parse($time) : null,
+            'sendsay_key' => $sendSayKey
         ];
     }
 
@@ -484,6 +541,8 @@ class ImportCampaignsSandSay extends Command
             : Carbon::now()->subDay()->format('Y-m-d');
 
         $this->toDate = Carbon::now()->subDay()->format('Y-m-d');
+
+        $this->withUpdate = (bool)$this->option('withUpdate');
 
         $limit = (int)$this->option('limit');
         $sleep = (int)$this->option('sleep');
@@ -521,11 +580,12 @@ class ImportCampaignsSandSay extends Command
         $issues = SendsayIssue::query()
             ->select(['id', 'delivered'])
             ->get();
-
-        foreach ($issues as $issue) {
-            $stats = $this->getActualStats($issue->id);
-            $this->updateIssueStats($issue, $stats);
-        }
+        collect($issues)->chunk(100)->each(function ($chunk) {
+            foreach ($chunk as $issue) {
+                $stats = $this->getActualStats($issue->id);
+                $this->updateIssueStats($issue, $stats);
+            }
+        });
     }
 
     /**

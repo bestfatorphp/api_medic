@@ -213,4 +213,33 @@ trait MutatorsHelper
 
         return null;
     }
+
+    /**
+     * Приводим номер телефона к формату 7XXXXXXXXXX (11 цифр)
+     * @param string|null $newValue
+     * @param string|null $currentValue
+     * @return string|null
+     */
+    protected function parsePhone(?string $newValue, ?string $currentValue): ?string
+    {
+        if (empty($newValue) && empty($currentValue)) {
+            return null;
+        }
+
+        if ($currentValue && preg_match('/^7\d{10}$/', $currentValue)) {
+            return $currentValue;
+        }
+
+        $value = preg_replace('/[^\d]/', '', $newValue);
+
+        if (empty($value)) {
+            return null;
+        }
+
+        if (strlen($value) === 11 && str_starts_with($value, '8')) {
+            return '7' . substr($value, 1);
+        }
+
+        return null;
+    }
 }
