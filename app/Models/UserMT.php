@@ -162,10 +162,7 @@ class UserMT extends Model
      */
     public function setPhoneAttribute($value)
     {
-        $value = $value ? preg_replace('/[^0-9]/', '', $value) : null;
-        if ($this->shouldUpdateFieldByLength($value, $this->attributes['phone'] ?? null)) {
-            $this->attributes['phone'] = $value;
-        }
+        $this->attributes['phone'] = $this->parsePhone($value, $this->attributes['phone'] ?? null);
     }
 
     /**

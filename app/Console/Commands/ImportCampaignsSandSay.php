@@ -339,7 +339,6 @@ class ImportCampaignsSandSay extends Command
                                     [
                                         'issue_id' => $issueId,
                                         'email' => $email,
-                                        'update_time' => $updateTime,
                                         'sendsay_key' => $key
                                     ],
                                     $participation
