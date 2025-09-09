@@ -70,7 +70,7 @@ class ImportCampaignsSandSay extends Command
      * Статусы для получения участий
      * @var array|string[]
      */
-    private array $statuses = ['click', 'read', 'deliv.issue'];
+    private array $statuses = ['click', 'read'/*, 'deliv.issue'*/];
 
     /**
      * Поля статистики, получаемые из API SendSay
