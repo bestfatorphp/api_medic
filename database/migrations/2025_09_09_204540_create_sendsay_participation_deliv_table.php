@@ -13,6 +13,10 @@ class CreateSendsayParticipationDelivTable extends Migration
      */
     public function up()
     {
+        Schema::table('sendsay_participation', function (Blueprint $table) {
+            $table->dropColumn('sendsay_key');
+        });
+
         Schema::create('sendsay_participation_deliv', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('issue_id')->comment('ID sendsay рассылки');

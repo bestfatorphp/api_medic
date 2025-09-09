@@ -40,7 +40,7 @@ class Kernel extends ConsoleKernel
         //Получние sendsay deliv
         //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 (отработала)
 
-        //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 --withUpdate=1 (дата на 2 дня назад от текущей)
+        //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 --fromLastDeliv=1 (дата на 2 дня назад от текущей, при 502)
 
 
         $commonPath = 'logs/';
@@ -59,7 +59,7 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:20')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
-        $schedule->command('import:sendsay-stats --withUpdate=1')
+        $schedule->command('import:sendsay-stats') //добавить ----fromLastDeliv=1
             ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 

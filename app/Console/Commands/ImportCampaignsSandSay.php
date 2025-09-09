@@ -69,7 +69,7 @@ class ImportCampaignsSandSay extends Command
      * Статусы для получения участий
      * @var array|string[]
      */
-    private array $statuses = ['click', 'read', 'deliv.issue'];
+    private array $statuses = ['click', 'read'/*, 'deliv.issue'*/];
 
     /**
      * Поля статистики, получаемые из API SendSay
@@ -101,10 +101,6 @@ class ImportCampaignsSandSay extends Command
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
-
-        SendsayParticipation::query()->where('sendsay_key', '=', 'deliv.issue')->delete();
-        $this->info('Рассылки удалены');
-        return CommandAlias::SUCCESS;
 
         try {
             $options = $this->validateOptions();
