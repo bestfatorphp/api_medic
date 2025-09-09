@@ -343,7 +343,7 @@ class ImportCampaignsSandSay extends Command
         if (!empty($batchParticipations)) {
             $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
                 if ($status === 'deliv.issue') {
-                    SendsayParticipation::insertOrIgnore($batchParticipations);
+                    SendsayParticipationDeliv::insertOrIgnore($batchParticipations);
                 } else {
                     SendsayParticipation::insert($batchParticipations);
                 }
