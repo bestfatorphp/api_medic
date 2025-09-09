@@ -8,6 +8,7 @@ use App\Models\CommonDatabase;
 use App\Models\SendsayContact;
 use App\Models\SendsayIssue;
 use App\Models\SendsayParticipation;
+use App\Models\SendsayParticipationDeliv;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -69,7 +70,7 @@ class ImportCampaignsSandSay extends Command
      * Статусы для получения участий
      * @var array|string[]
      */
-    private array $statuses = ['click', 'read'/*, 'deliv.issue'*/];
+    private array $statuses = ['click', 'read', 'deliv.issue'];
 
     /**
      * Поля статистики, получаемые из API SendSay
@@ -255,8 +256,7 @@ class ImportCampaignsSandSay extends Command
 
         //забираем последнюю дату deliv, чтобы собрать от неё (статстика по deliv только до 22.07.2025)
         if ($status === 'deliv.issue' && $this->fromLastDeliv) {
-            $lastDeliv = SendsayParticipation::where('sendsay_key', $status)
-                ->latest('update_time')
+            $lastDeliv = SendsayParticipationDeliv::query()->latest('update_time')
                 ->value('update_time');
 
             $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
@@ -283,7 +283,7 @@ class ImportCampaignsSandSay extends Command
                 $result = $statusesData[$status];
                 $email = $participation[0];
                 $issueId = (int)$participation[1];
-                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$status === 'click' ? 3 : 2], $status);
+                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$status === 'click' ? 3 : 2]);
 
                 // Принудительно сохраняем каждые N записей
                 if (count($batchParticipations) % 100 == 0) {
@@ -509,18 +509,16 @@ class ImportCampaignsSandSay extends Command
      * @param string $email
      * @param string $result
      * @param string|null $time
-     * @param string $sendSayKey
      * @return array
      */
-    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null", "sendsay_key" => "string"])]
-    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null, string $sendSayKey): array
+    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null"])]
+    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null): array
     {
         return [
             'issue_id' => $issueId,
             'email' => $email,
             'result' => $result,
             'update_time' => !empty($time) ? Carbon::parse($time) : null,
-            'sendsay_key' => $sendSayKey
         ];
     }
 
