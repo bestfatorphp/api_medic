@@ -260,6 +260,8 @@ class ImportCampaignsSandSay extends Command
                 ->value('update_time');
 
             $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
+
+            $this->info("Дата от, для deliv.issue изменена на {$this->fromDate}");
         }
 
         do {

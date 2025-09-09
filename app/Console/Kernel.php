@@ -38,10 +38,16 @@ class Kernel extends ConsoleKernel
         //import:sendsay-stats --from=01.05.2025 (отработала)
 
         //Получние sendsay deliv
-        //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1
+        //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 (отработала)
+
+        //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 --withUpdate=1 (дата на 2 дня назад от текущей)
 
 
         $commonPath = 'logs/';
+
+        $schedule->command('import:sendsay-stats --onlyDeliv=1 --withUpdate=1')
+            ->dailyAt('15:10')
+            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay1.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
