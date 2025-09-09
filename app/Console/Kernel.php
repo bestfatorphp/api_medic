@@ -45,10 +45,6 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
-        $schedule->command('import:sendsay-stats --onlyDeliv=1 --withUpdate=1')
-            ->dailyAt('15:10')
-            ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay1.log"));
-
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
        $schedule->command('import:id-campaigns')
