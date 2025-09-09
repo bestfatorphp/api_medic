@@ -43,11 +43,20 @@ class SendsayIssue extends Model
     ];
 
     /**
-     * Unisender участия
+     * Unisender участия click и read
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function sendsay_participations()
     {
         return $this->hasMany(SendsayParticipation::class, 'issue_id');
+    }
+
+    /**
+     * Unisender участия deliv.issue
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function sendsay_participations_deliv()
+    {
+        return $this->hasMany(SendsayParticipationDeliv::class, 'issue_id');
     }
 }

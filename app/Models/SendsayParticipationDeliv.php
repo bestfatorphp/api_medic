@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Sendsay участия click и read
- * Class SendsayParticipation
+ * Sendsay участия deliv.issue
+ * Class SendsayParticipationDeliv
  * @package App\Models
  *
  * @property integer        $id
@@ -17,11 +17,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property string         $result                 Результат отправки
  * @property Carbon         $update_time            Время обновления
  */
-class SendsayParticipation extends Model
+class SendsayParticipationDeliv extends Model
 {
     use HasFactory;
 
-    protected $table = 'sendsay_participation';
+    protected $table = 'sendsay_participation_deliv';
 
     protected $fillable = [
         'issue_id',

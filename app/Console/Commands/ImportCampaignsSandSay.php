@@ -31,7 +31,7 @@ class ImportCampaignsSandSay extends Command
      */
     protected $signature = 'import:sendsay-stats
                             {--from= : Начальная дата сбора clicks и read в формате DD.MM.YYYY}
-                            {--withUpdate=0}
+                            {--fromLastDeliv=0}
                             {--onlyDeliv=0}
                             {--limit=500 : Колличество записей за один запрос}
                             {--sleep=1 : Задержка между запросами}';
@@ -63,7 +63,7 @@ class ImportCampaignsSandSay extends Command
      * Обновлять ли участия доставки писем пользователям
      * @var bool
      */
-    private bool $withUpdate;
+    private bool $fromLastDeliv;
 
     /**
      * Статусы для получения участий
@@ -101,6 +101,10 @@ class ImportCampaignsSandSay extends Command
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
+
+        SendsayParticipation::query()->where('sendsay_key', '=', 'deliv.issue')->delete();
+        $this->info('Рассылки удалены');
+        return CommandAlias::SUCCESS;
 
         try {
             $options = $this->validateOptions();
@@ -254,7 +258,7 @@ class ImportCampaignsSandSay extends Command
         $count = 0;
 
         //забираем последнюю дату deliv, чтобы собрать от неё (статстика по deliv только до 22.07.2025)
-        if ($status === 'deliv.issue' && $this->withUpdate) {
+        if ($status === 'deliv.issue' && $this->fromLastDeliv) {
             $lastDeliv = SendsayParticipation::where('sendsay_key', $status)
                 ->latest('update_time')
                 ->value('update_time');
@@ -341,24 +345,13 @@ class ImportCampaignsSandSay extends Command
     private function saveBatchDataParticipations(array &$batchParticipations, string $status): void
     {
         if (!empty($batchParticipations)) {
-                $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
-                    if ($status === 'deliv.issue' && $this->withUpdate) {
-                        collect($batchParticipations)->chunk(100)->each(function ($chunk) {
-                            foreach ($chunk as $participation) {
-                                SendsayParticipation::query()->updateOrCreate(
-                                    [
-                                        'issue_id' => $participation['issue_id'],
-                                        'email' => $participation['email'],
-                                        'sendsay_key' => $participation['sendsay_key']
-                                    ],
-                                    $participation
-                                );
-                            }
-                        });
-                    } else {
-                        SendsayParticipation::insert($batchParticipations);
-                    }
-                });
+            $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
+                if ($status === 'deliv.issue') {
+                    SendsayParticipation::insertOrIgnore($batchParticipations);
+                } else {
+                    SendsayParticipation::insert($batchParticipations);
+                }
+            });
 
             $batchParticipations = [];
 
@@ -548,7 +541,7 @@ class ImportCampaignsSandSay extends Command
 
         $this->toDate = Carbon::now()->subDay()->format('Y-m-d');
 
-        $this->withUpdate = (bool)$this->option('withUpdate');
+        $this->fromLastDeliv = (bool)$this->option('fromLastDeliv');
 
         $limit = (int)$this->option('limit');
         $sleep = (int)$this->option('sleep');
