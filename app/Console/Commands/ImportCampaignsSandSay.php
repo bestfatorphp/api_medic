@@ -266,8 +266,8 @@ class ImportCampaignsSandSay extends Command
             $lastDeliv = SendsayParticipation::query()->where('sendsay_key', $status)->latest('update_time')
                 ->value('update_time');
 
-//            $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
-            $this->fromDate = Carbon::now()->subDays(10)->format('Y-m-d'); //открыть после того, как соберём всю статистику, т.к. здесь ещё может быть статус is sent
+            $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
+//            $this->fromDate = Carbon::now()->subDays(10)->format('Y-m-d'); //открыть после того, как соберём всю статистику, т.к. здесь ещё может быть статус is sent
 
             $this->info("Дата от, для deliv.issue изменена на {$this->fromDate}");
         }
