@@ -28,14 +28,8 @@ Route::get('/', function () {
 //        $q->where('old_mt_id', 1);
 //    })->with(['actions_mt_helios'])->limit(1)->get()->toArray();
 //    return \App\Models\ProjectTouchMT::find(10321);
-    return \App\Models\SendsayIssue::where('id', 565) //c 563, c 572 и далее - есть "is sent"
+    return \App\Models\SendsayIssue::where('id', 578) //c 563, c 572 и далее - есть "is sent"
         ->withCount([
-//            'sendsay_participations as clicked_count' => function($query) {
-//                $query->where('result', 'clicked');
-//            },
-//            'sendsay_participations as read_count' => function($query) {
-//                $query->where('result', 'read');
-//            },
             'sendsay_participations as participation_delivered_count' => function($query) {
                 $query->where('result', 'delivered');
             },

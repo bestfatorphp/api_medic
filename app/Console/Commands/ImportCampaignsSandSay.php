@@ -8,7 +8,6 @@ use App\Models\CommonDatabase;
 use App\Models\SendsayContact;
 use App\Models\SendsayIssue;
 use App\Models\SendsayParticipation;
-use App\Models\SendsayParticipationDeliv;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -70,7 +69,7 @@ class ImportCampaignsSandSay extends Command
      * Статусы для получения участий
      * @var array|string[]
      */
-    private array $statuses = ['click', 'read', 'deliv.issue'];
+    private array $statuses = ['click', 'read'/*, 'deliv.issue'*/];
 
     /**
      * Поля статистики, получаемые из API SendSay
@@ -102,13 +101,6 @@ class ImportCampaignsSandSay extends Command
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
-
-//        $count = SendsayParticipationDeliv::whereNotNull('issue_id')->count();
-//        $this->info("Найдено записей: " . $count);
-//
-//        SendsayParticipationDeliv::query()->whereNotNull('issue_id')->delete();
-//        $this->info('Нет рассылок за указанный период');
-//        return CommandAlias::SUCCESS;
 
         try {
             $options = $this->validateOptions();
