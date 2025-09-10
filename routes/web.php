@@ -27,5 +27,24 @@ Route::get('/', function () {
 //    return CommonDatabase::whereHas('actions_mt_helios', function ($q) {
 //        $q->where('old_mt_id', 1);
 //    })->with(['actions_mt_helios'])->limit(1)->get()->toArray();
-    return \App\Models\ProjectTouchMT::find(10321);
+//    return \App\Models\ProjectTouchMT::find(10321);
+    return \App\Models\SendsayIssue::where('id', 565) //c 563, c 572 и далее - есть "is sent"
+        ->withCount([
+//            'sendsay_participations as clicked_count' => function($query) {
+//                $query->where('result', 'clicked');
+//            },
+//            'sendsay_participations as read_count' => function($query) {
+//                $query->where('result', 'read');
+//            },
+            'sendsay_participations as participation_delivered_count' => function($query) {
+                $query->where('result', 'delivered');
+            },
+            'sendsay_participations as participation_not_delivered_count' => function($query) {
+                $query->where('result', 'not delivered');
+            },
+            'sendsay_participations as participation_is_sent_count' => function($query) {
+                $query->where('result', 'is sent');
+            }
+        ])
+        ->first();
 });

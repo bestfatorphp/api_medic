@@ -70,7 +70,7 @@ class ImportCampaignsSandSay extends Command
      * Статусы для получения участий
      * @var array|string[]
      */
-    private array $statuses = ['click', 'read'/*, 'deliv.issue'*/];
+    private array $statuses = ['click', 'read', 'deliv.issue'];
 
     /**
      * Поля статистики, получаемые из API SendSay
@@ -102,6 +102,13 @@ class ImportCampaignsSandSay extends Command
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
         set_time_limit(0); //без ограничения времени выполнения
         DB::disableQueryLog(); //отключаем логирование запросов
+
+//        $count = SendsayParticipationDeliv::whereNotNull('issue_id')->count();
+//        $this->info("Найдено записей: " . $count);
+//
+//        SendsayParticipationDeliv::query()->whereNotNull('issue_id')->delete();
+//        $this->info('Нет рассылок за указанный период');
+//        return CommandAlias::SUCCESS;
 
         try {
             $options = $this->validateOptions();
@@ -256,10 +263,11 @@ class ImportCampaignsSandSay extends Command
 
         //забираем последнюю дату deliv, чтобы собрать от неё (статстика по deliv только до 22.07.2025)
         if ($status === 'deliv.issue' && $this->fromLastDeliv) {
-            $lastDeliv = SendsayParticipationDeliv::query()->latest('update_time')
+            $lastDeliv = SendsayParticipation::query()->where('sendsay_key', $status)->latest('update_time')
                 ->value('update_time');
 
-            $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
+//            $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
+            $this->fromDate = Carbon::now()->subDays(10)->format('Y-m-d'); //открыть после того, как соберём всю статистику, т.к. здесь ещё может быть статус is sent
 
             $this->info("Дата от, для deliv.issue изменена на {$this->fromDate}");
         }
@@ -277,13 +285,18 @@ class ImportCampaignsSandSay extends Command
 
             foreach ($participations as $participation) {
                 if ($status === 'deliv.issue' && (int)$participation[3] < 1) {
-                    $statusesData[$status] = 'not delivered';
+                    if ((int)$participation[3] === 0) {
+                        $statusesData[$status] = 'is sent'; //не доставлено
+                    } else {
+                        $statusesData[$status] = 'not delivered';       //отправляется
+                    }
+
                 }
 
                 $result = $statusesData[$status];
                 $email = $participation[0];
                 $issueId = (int)$participation[1];
-                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $participation[$status === 'click' ? 3 : 2]);
+                $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $status, $participation[$status === 'click' ? 3 : 2]);
 
                 // Принудительно сохраняем каждые N записей
                 if (count($batchParticipations) % 100 == 0) {
@@ -343,7 +356,19 @@ class ImportCampaignsSandSay extends Command
         if (!empty($batchParticipations)) {
             $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
                 if ($status === 'deliv.issue') {
-                    SendsayParticipationDeliv::insertOrIgnore($batchParticipations);
+                    collect($batchParticipations)->chunk(100)->each(function ($chunk) {
+                        foreach ($chunk as $participation) {
+                            SendsayParticipation::query()->updateOrCreate(
+                                [
+                                    'issue_id' => $participation['issue_id'],
+                                    'email' => $participation['email'],
+                                    'sendsay_key' => $participation['sendsay_key'],
+                                ],
+                                $participation
+                            );
+                        }
+                    });
+
                 } else {
                     SendsayParticipation::insert($batchParticipations);
                 }
@@ -441,7 +466,7 @@ class ImportCampaignsSandSay extends Command
                     "deliv.member.email",
                     "deliv.issue.id",
                     "deliv.issue.dt",
-                    "deliv.result"
+                    "deliv.result",
                 ],
                 'filter' => $filter
             ],
@@ -508,17 +533,19 @@ class ImportCampaignsSandSay extends Command
      * @param int $issueId
      * @param string $email
      * @param string $result
+     * @param string $sendsayKey
      * @param string|null $time
      * @return array
      */
-    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'update_time' => "\Carbon\Carbon|null"])]
-    private function prepareParticipationResult(int $issueId, string $email, string $result, string $time = null): array
+    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'sendsay_key' => "string", 'update_time' => "\Carbon\Carbon|null"])]
+    private function prepareParticipationResult(int $issueId, string $email, string $result, string $sendsayKey, string $time = null): array
     {
         return [
             'issue_id' => $issueId,
             'email' => $email,
             'result' => $result,
             'update_time' => !empty($time) ? Carbon::parse($time) : null,
+            'sendsay_key' => $sendsayKey
         ];
     }
 

@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string         $email                  E-mail
  * @property string         $result                 Результат отправки
  * @property Carbon         $update_time            Время обновления
+ * @property string         $sendsay_key
  */
 class SendsayParticipation extends Model
 {
@@ -27,7 +28,8 @@ class SendsayParticipation extends Model
         'issue_id',
         'email',
         'result',
-        'update_time'
+        'update_time',
+        'sendsay_key'
     ];
 
     public $timestamps = false;
