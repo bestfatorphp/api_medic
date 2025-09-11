@@ -33,17 +33,20 @@ class Kernel extends ConsoleKernel
 
         //import:medtouch-reg-users --chunk=5 --timeout=120 --need-file=true (отработала)
 
-        //import:id-campaigns (ПРОВЕРИТЬ!!!)
+        //import:id-campaigns (отработала)
 
         //import:sendsay-stats --from=01.05.2025 (отработала)
 
-        //Получние sendsay deliv
+        //Получние sendsay deliv (пока не получаем, т.к. данные не соотвествуют)
         //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1
-
         //import:sendsay-stats --from=01.05.2025 --onlyDeliv=1 --fromLastDeliv=1 (дата на 2 дня назад от текущей, при 502)
 
 
         $commonPath = 'logs/';
+
+        $schedule->command('calculate:data-common-db')
+            ->dailyAt('18:17')
+            ->sendOutputTo(storage_path("{$commonPath}calculate-data-commondb.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
@@ -51,20 +54,20 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:01')
             ->sendOutputTo(storage_path("{$commonPath}import-id-campaigns.log"));
 
-        $schedule->command('import:new-mt-users')
+       $schedule->command('import:new-mt-users')
             ->dailyAt('00:10')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
 
-        $schedule->command('import:new-mt-touches')
+       $schedule->command('import:new-mt-touches')
             ->dailyAt('00:20')
             ->sendOutputTo(storage_path("{$commonPath}import-new-mt-touches.log"));
 
-        $schedule->command('import:sendsay-stats') //добавить --fromLastDeliv=1
+       $schedule->command('import:sendsay-stats')
             ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-        $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->dailyAt('05:30')
+       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+            ->dailyAt('01:30')
             ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
             ->then(function () use ($commonPath) {
                 //создаём и запускаем команду вручную с ожиданием, пока не отработает первая,
@@ -94,6 +97,10 @@ class Kernel extends ConsoleKernel
                     Log::channel('commands')->error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
                 }
             });
+
+       $schedule->command('calculate:data-common-db')
+            ->dailyAt('05:30')
+            ->sendOutputTo(storage_path("{$commonPath}calculate-data-commondb.log"));
 
 
         //разовая команда (после оплаты аккаунта собрать)

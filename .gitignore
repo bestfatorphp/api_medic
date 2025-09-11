@@ -17,3 +17,5 @@ Dockerfile
 app/Console/Commands/TestIntelectDialogApi.php
 app/Console/Commands/TestSendSayApi.php
 app/Console/Commands/MonitorMemoryUsage.php
+backup.sql
+.dockerignore
