@@ -1695,7 +1695,7 @@ class IntellectDialogService
             [
                 'url' => 'required|url',
                 'events' => 'required|array',
-                'events.*' => 'in:new_message,new_status',
+                'events.*' => 'in:new_message,new_status,new_error',
             ]
         );
 
