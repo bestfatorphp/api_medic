@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PrivateFileController;
+use App\Http\Controllers\WebhooksController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -21,3 +22,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::middleware('private.disk')->get('/private/{path}', [PrivateFileController::class, 'streamFile'])
     ->where('path', '.*');
+
+Route::post('/webhook/id-errors', [WebhooksController::class, 'intellectDialogErrors']);
