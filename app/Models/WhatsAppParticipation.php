@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property Carbon         $send_date              Время отправки
  * @property Carbon         $delivered_at           Время доставки
  * @property Carbon         $opened_at              Время открытия
+ * @property boolean        $error                  Сообщение небыло отправлено из-за ошибки
  */
 class WhatsAppParticipation extends Model
 {
@@ -36,6 +37,7 @@ class WhatsAppParticipation extends Model
         'send_date',
         'delivered_at',
         'opened_at',
+        'error'
     ];
 
     protected $with = [

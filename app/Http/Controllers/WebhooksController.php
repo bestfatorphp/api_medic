@@ -28,8 +28,6 @@ class WebhooksController extends Controller
 
         Log::channel('commands')->warning('IntellectDialog webhook error message', $data);
 
-        return response('ok', 200);
-
         $validator = Validator::make($request->all(), [
             'message_id' => 'required|string',
             'phone'      => 'nullable|string',
@@ -42,15 +40,13 @@ class WebhooksController extends Controller
                 'errors' => $validator->errors(),
                 'payload' => $data,
             ]);
-            return response()->json(['error' => 'Invalid payload'], 400);
+            return response('error', 400);
         }
 
         try {
             $message = IntellectDialog::message($data['message_id']);
 
             Log::channel('commands')->warning('IntellectDialog webhook error message', $message);
-
-            return response('ok', 200);
 
             if ($message['type_name'] !== "Исходящее") {
                 return response('ok', 200);
