@@ -102,7 +102,7 @@ class WebhooksController extends Controller
                 'trace' => $e->getTraceAsString(),
                 'payload' => $request->all(),
             ]);
-            return response('error', 500);
+            return response('error', 200);
         }
 
         return response('ok', 200);
