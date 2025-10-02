@@ -40,7 +40,7 @@ class WebhooksController extends Controller
                 'errors' => $validator->errors(),
                 'payload' => $data,
             ]);
-            return response('error', 400);
+            return response('error', 200);
         }
 
         try {
