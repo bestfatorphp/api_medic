@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\ImportSendSay;
 
 use App\Facades\SendSay;
 use App\Logging\CustomLog;
@@ -10,8 +10,6 @@ use App\Models\SendsayIssue;
 use App\Models\SendsayParticipation;
 use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -22,7 +20,7 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
  *
  * !!! Забирать данные now - 2 days, иначе баг выборки по датам
  */
-class ImportCampaignsSandSay extends Command
+class ImportCampaignsSandSay extends Common
 {
     use WriteLockTrait;
 
@@ -98,10 +96,6 @@ class ImportCampaignsSandSay extends Command
      */
     public function handle(): int
     {
-        ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M'); //установка лимита памяти
-        set_time_limit(0); //без ограничения времени выполнения
-        DB::disableQueryLog(); //отключаем логирование запросов
-
         try {
             $options = $this->validateOptions();
             $issues = $this->getIssuesList();
@@ -259,7 +253,6 @@ class ImportCampaignsSandSay extends Command
                 ->value('update_time');
 
             $this->fromDate = Carbon::parse($lastDeliv)->subDays(2)->format('Y-m-d');
-//            $this->fromDate = Carbon::now()->subDays(10)->format('Y-m-d'); //открыть после того, как соберём всю статистику, т.к. здесь ещё может быть статус is sent
 
             $this->info("Дата от, для deliv.issue изменена на {$this->fromDate}");
         }
@@ -269,20 +262,19 @@ class ImportCampaignsSandSay extends Command
             //получаем clicked и read
             $participations = $this->getParticipationsByDates($status, $limit, $skip);
 
-            $statusesData = [
-                'click' => 'clicked',
-                'read' => 'read',
-                'deliv.issue' => 'delivered',
-            ];
-
             foreach ($participations as $participation) {
+                $statusesData = [
+                    'click' => 'clicked',
+                    'read' => 'read',
+                    'deliv.issue' => 'delivered',
+                ];
+
                 if ($status === 'deliv.issue' && (int)$participation[3] < 1) {
                     if ((int)$participation[3] === 0) {
-                        $statusesData[$status] = 'is sent'; //не доставлено
+                        $statusesData[$status] = 'is sent';
                     } else {
-                        $statusesData[$status] = 'not delivered';       //отправляется
+                        $statusesData[$status] = 'not delivered';
                     }
-
                 }
 
                 $result = $statusesData[$status];
@@ -290,13 +282,11 @@ class ImportCampaignsSandSay extends Command
                 $issueId = (int)$participation[1];
                 $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $status, $participation[$status === 'click' ? 3 : 2]);
 
-                // Принудительно сохраняем каждые N записей
                 if (count($batchParticipations) % 100 == 0) {
                     $this->saveBatchDataParticipations($batchParticipations, $status);
                 }
             }
 
-            // Сохраняем остатки после каждого запроса к API
             if (!empty($batchParticipations)) {
                 $this->saveBatchDataParticipations($batchParticipations, $status);
             }
@@ -337,41 +327,6 @@ class ImportCampaignsSandSay extends Command
 
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
-
-    /**
-     * Пакетная вставка участий
-     * @param array $batchParticipations
-     * @param string $status
-     */
-    private function saveBatchDataParticipations(array &$batchParticipations, string $status): void
-    {
-        if (!empty($batchParticipations)) {
-            $this->withTableLock('sendsay_participation', function () use ($batchParticipations, $status) {
-                if ($status === 'deliv.issue') {
-                    collect($batchParticipations)->chunk(100)->each(function ($chunk) {
-                        foreach ($chunk as $participation) {
-                            SendsayParticipation::query()->updateOrCreate(
-                                [
-                                    'issue_id' => $participation['issue_id'],
-                                    'email' => $participation['email'],
-                                    'sendsay_key' => $participation['sendsay_key'],
-                                ],
-                                $participation
-                            );
-                        }
-                    });
-
-                } else {
-                    SendsayParticipation::insert($batchParticipations);
-                }
-            });
-
-            $batchParticipations = [];
-
-            gc_mem_caches(); //очищаем кэши памяти Zend Engine
-        }
-    }
-
 
     /**
      * Сохраняем/обновляем рассылку
@@ -480,6 +435,8 @@ class ImportCampaignsSandSay extends Command
 
         $response = SendSay::statUni($common);
 
+        sleep(1);
+
 
         if(!empty($response['errors']) || !empty($response['error'])) {
             Log::channel('commands')->error('err:', $response);
@@ -518,27 +475,6 @@ class ImportCampaignsSandSay extends Command
 //                            ],
 //                            ....
 //                        ]
-    }
-
-    /**
-     * Подготавливаем данные участия
-     * @param int $issueId
-     * @param string $email
-     * @param string $result
-     * @param string $sendsayKey
-     * @param string|null $time
-     * @return array
-     */
-    #[ArrayShape(['issue_id' => "int", 'email' => "string", 'result' => "string", 'sendsay_key' => "string", 'update_time' => "\Carbon\Carbon|null"])]
-    private function prepareParticipationResult(int $issueId, string $email, string $result, string $sendsayKey, string $time = null): array
-    {
-        return [
-            'issue_id' => $issueId,
-            'email' => $email,
-            'result' => $result,
-            'update_time' => !empty($time) ? Carbon::parse($time) : null,
-            'sendsay_key' => $sendsayKey
-        ];
     }
 
     /**
@@ -598,68 +534,5 @@ class ImportCampaignsSandSay extends Command
                 $this->updateIssueStats($issue, $stats);
             }
         });
-    }
-
-    /**
-     * Считаем click и read
-     * @param int $issueId
-     * @return array
-     */
-    #[ArrayShape(['clicked' => "int", 'read' => "int"])]
-    private function getActualStats(int $issueId): array
-    {
-        return [
-            'clicked' => SendsayParticipation::query()
-                ->where('issue_id', $issueId)
-                ->where('result', 'clicked')
-                ->count(),
-
-            'read' => SendsayParticipation::query()
-                ->where('issue_id', $issueId)
-                ->where('result', 'read')
-                ->count(),
-        ];
-    }
-
-    /**
-     * Обновляем запись рассылки
-     * @param SendsayIssue $issue
-     * @param array $stats
-     */
-    private function updateIssueStats(SendsayIssue $issue, array $stats): void
-    {
-        $delivered = $issue->delivered;
-        $clicked = $stats['clicked'];
-        $read = $stats['read'];
-
-        $issue->update([
-            'clicked' => $clicked,
-            'opened' => $read,
-            'open_rate' => $this->calculateRate($delivered, $read),
-            'ctr' => $this->calculateRate($delivered, $clicked),
-            'ctor' => $this->calculateRate($read, $clicked),
-        ]);
-    }
-
-    /**
-     * Рассчитывает процент
-     * @param int $total Общее количество
-     * @param int $countSuccess Количество успешных
-     *
-     * @return float Процент доставки (0-100)
-     */
-    private function calculateRate(int $total, int $countSuccess): float
-    {
-        if ($total <= 0) {
-            return 0.0;
-        }
-
-        $rate = ($countSuccess / $total) * 100;
-
-        if ($rate > 100) {
-            $rate = 100;
-        }
-
-        return round($rate, 2);
     }
 }
