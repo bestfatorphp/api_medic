@@ -4,14 +4,11 @@ namespace App\Console\Commands\ImportSendSay;
 
 use App\Facades\SendSay;
 use App\Models\SendsayIssue;
-use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class ImportCampaignsSandSayDeliv extends Common
 {
-    use WriteLockTrait;
-
     /**
      * The name and signature of the console command.
      *

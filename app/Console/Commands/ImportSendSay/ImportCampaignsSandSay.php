@@ -8,7 +8,6 @@ use App\Models\CommonDatabase;
 use App\Models\SendsayContact;
 use App\Models\SendsayIssue;
 use App\Models\SendsayParticipation;
-use App\Traits\WriteLockTrait;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use JetBrains\PhpStorm\ArrayShape;
@@ -22,8 +21,6 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
  */
 class ImportCampaignsSandSay extends Common
 {
-    use WriteLockTrait;
-
     /**
      * @var string
      */
