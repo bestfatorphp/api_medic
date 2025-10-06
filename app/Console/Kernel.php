@@ -98,9 +98,9 @@ class Kernel extends ConsoleKernel
             ->dailyAt('05:30')
             ->sendOutputTo(storage_path("{$commonPath}calculate-data-commondb.log"));
 
-        $schedule->command('import:sendsay-stats-deliv')
+        $schedule->command('import:sendsay-stats-deliv --hasIsSent=1') //собираем за предыдущие сутки + обновляем все где есть is sent
             ->dailyAt('06:30')
-            ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log")); //добавить --hasIsSent=1
+            ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
 
 
         //разовая команда (после оплаты аккаунта собрать)
