@@ -28,7 +28,7 @@ Route::get('/', function () {
 //        $q->where('old_mt_id', 1);
 //    })->with(['actions_mt_helios'])->limit(1)->get()->toArray();
 //    return \App\Models\ProjectTouchMT::find(10321);
-    return \App\Models\SendsayIssue::where('id', 17) //c 563, c 572 и далее - есть "is sent"
+    return \App\Models\SendsayIssue::where('id', 769) //c 563, c 572 и далее - есть "is sent"
         ->withCount([
             'sendsay_participations as participation_delivered_count' => function($query) {
                 $query->where('result', 'delivered');

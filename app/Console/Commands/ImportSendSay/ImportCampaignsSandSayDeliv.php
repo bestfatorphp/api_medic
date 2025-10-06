@@ -52,7 +52,7 @@ class ImportCampaignsSandSayDeliv extends Common
             });
         }
 
-        $issues = $builder->get();
+        $issues = $builder->orderBy('id')->get();
 
         $sendsayKey = 'deliv.issue';
 
