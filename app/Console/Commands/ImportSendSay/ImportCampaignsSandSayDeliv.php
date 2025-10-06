@@ -115,6 +115,7 @@ class ImportCampaignsSandSayDeliv extends Common
             $this->updateIssueStats($issue, $stats);
         }
 
+        $this->info("Сбор deliv завершён!");
         return self::SUCCESS;
     }
 
