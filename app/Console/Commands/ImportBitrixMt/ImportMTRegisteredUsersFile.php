@@ -314,12 +314,12 @@ class ImportMTRegisteredUsersFile extends Common
                 }
 
                 if (empty($email = $row[7]) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    Log::channel('commands')->warning("Пропущена некорректная строка с невалидным email: {$email}");
+                    $this->warn("Пропущена некорректная строка с невалидным email: {$email}");
                     continue;
                 }
 
                 if (in_array($email, $EMAILS)) {
-                    Log::channel('commands')->info("Дубликат - $email");
+                    $this->warn("Дубликат - $email");
                     continue;
                 }
 
@@ -348,11 +348,16 @@ class ImportMTRegisteredUsersFile extends Common
                             'uf_utm_content' => $userMTData['uf_utm_content'], //если не заполнено
                         ]
                     );
-                });
+                }, true);
+
+                if ($userMt instanceof \Exception) {
+                    $this->error("Ошибка записи в users_mt: " . $userMt->getMessage());
+                    // Дополнительно можно обработать ошибку, например, пропустить текущую итерацию
+                    continue;
+                }
 
                 if (!$userMt) {
                     $this->warn("Ошибка создания/обновления пользователя: {$userMTData['email']}");
-                    Log::channel('commands')->warning("Ошибка создания/обновления пользователя", $userMTData);
                     continue;
                 }
 
@@ -470,10 +475,13 @@ class ImportMTRegisteredUsersFile extends Common
         ];
     }
 
+    /**
+     * @throws \Exception
+     */
     private function upsertBatchCommonDb(array &$commonDBBatch, array &$EMAILS)
     {
         $this->info("Пакетная вставка - " . count($commonDBBatch));
-        $this->withTableLock('common_database', function () use ($commonDBBatch) {
+        $data = $this->withTableLock('common_database', function () use ($commonDBBatch) {
             CommonDatabase::upsertWithMutators(
                 $commonDBBatch,
                 ['email'],
@@ -492,7 +500,11 @@ class ImportMTRegisteredUsersFile extends Common
                     'registration_website' //если не заполнено
                 ]
             );
-        });
+        }, true);
+
+        if ($data instanceof \Exception) {
+            $this->error("Ошибка записи в common_database: " . $data->getMessage());
+        }
 
         $commonDBBatch = [];
         $EMAILS = [];

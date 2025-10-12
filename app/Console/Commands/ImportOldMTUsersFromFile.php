@@ -122,7 +122,7 @@ class ImportOldMTUsersFromFile extends Command
             }
 
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                Log::channel('commands')->warning("Не валидный email: {$email}");
+                $this->warn("Не валидный email: {$email}");
                 $stats['skipped']++;
                 $progressBar->advance();
                 continue;

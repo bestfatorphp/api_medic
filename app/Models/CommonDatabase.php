@@ -39,6 +39,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string                 $verification_status    Статус верификации
  * @property boolean                $pharma                 Фарма
  * @property string                 $email_status           Статус e-mail
+ * @property string                 $category               Категория участий
+ * @property string                 $source                 Источник
  *
  * @property UserMT                 $user_mt
  * @property Doctor                 $doctor

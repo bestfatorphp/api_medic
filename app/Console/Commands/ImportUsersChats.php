@@ -203,6 +203,7 @@ class ImportUsersChats extends Command
     /**
      * Пакетная вставка чатов
      * @param array $batch
+     * @throws \Exception
      */
     private function insertBatch(array &$batch): void
     {

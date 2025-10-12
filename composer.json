@@ -13,6 +13,7 @@
         "laravel/sanctum": "^2.11",
         "laravel/tinker": "^2.5",
         "maatwebsite/excel": "^3.1",
+        "openspout/openspout": "^4.28",
         "symfony/panther": "^2.1"
     },
     "require-dev": {

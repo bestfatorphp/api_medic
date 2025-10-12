@@ -168,7 +168,7 @@ class ImportMTHeliosFile extends Common
 
                         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                             $userBitrixId = null;
-                            Log::channel('commands')->warning("Пропущена некорректная строка с невалидным email: {$email}");
+                            $this->warn("Пропущена некорректная строка с невалидным email: {$email}");
                             continue;
                         }
 
@@ -191,7 +191,6 @@ class ImportMTHeliosFile extends Common
                             }
                         }
                     } else {
-                        Log::channel('commands')->warning("Некорректная строка с пользователем: " . json_encode($row));
                         $this->warn("Пропущена некорректная строка с пользователем: " . $row[0]);
                     }
                     continue;
@@ -277,6 +276,7 @@ class ImportMTHeliosFile extends Common
 
     /**
      * @param array $actionsToInsert
+     * @throws \Exception
      */
     private function insertActions(array $actionsToInsert)
     {

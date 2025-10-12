@@ -119,7 +119,6 @@ class ImportCampaignsSandSay extends Common
                             sleep($options['sleep']);
                         }
                     } catch (\Exception $e) {
-                        Log::channel('commands')->error("Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                         $this->warn(" [!] Ошибка обработки issue {$issue['id']}: " . $e->getMessage());
                     }
                 }

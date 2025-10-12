@@ -87,8 +87,9 @@ trait WriteLockTrait
 
     /**
      * Безопасное выполнение с блокировкой таблицы
+     * @throws \Exception
      */
-    protected function withTableLock(string $tableName, callable $operation): mixed
+    protected function withTableLock(string $tableName, callable $operation, bool $withoutThrow = false): mixed
     {
         $this->lockTableForWrite($tableName);
 
@@ -96,6 +97,11 @@ trait WriteLockTrait
             return DB::transaction(function () use ($operation) {
                 return $operation();
             });
+        } catch (\Exception $e) {
+            if ($withoutThrow) {
+                return $e; //возвращаем объект исключения вместо его передачи
+            }
+            throw $e;
         } finally {
             $this->unlockTable($tableName);
         }

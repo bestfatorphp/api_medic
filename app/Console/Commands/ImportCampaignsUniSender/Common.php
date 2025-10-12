@@ -133,7 +133,6 @@ class Common extends Command
             });
         } catch (\Exception $e) {
             $this->error("Ошибка при обработке CSV-файла для кампании #{$campaign['id']}");
-            Log::channel('commands')->error(__CLASS__ . " Error: " . $e->getMessage());
             throw $e;
         }
     }
@@ -281,7 +280,7 @@ class Common extends Command
                     ];
 
                 } catch (\Exception $e) {
-                    Log::channel('commands')->error(__CLASS__ . "Ошибка при получении данных для email {$email}. Error: " . $e->getMessage());
+                    $this->error(__CLASS__ . "Ошибка при получении данных для email {$email}. Error: " . $e->getMessage());
                     continue; //пропускаем email, если произошла ошибка
                 }
 
