@@ -45,7 +45,7 @@ class Kernel extends ConsoleKernel
         $commonPath = 'logs/';
 
         $schedule->command('import:users-source')
-            ->dailyAt('20:50')
+            ->dailyAt('20:56')
             ->sendOutputTo(storage_path("{$commonPath}import-users-source.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
