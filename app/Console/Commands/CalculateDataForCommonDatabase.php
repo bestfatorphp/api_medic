@@ -33,14 +33,7 @@ class CalculateDataForCommonDatabase extends Command
         try {
             $this->info("Начинаем подсчёт. Чанк {$this->chunk}...");
 
-            //считаем planned_actions
-//            $this->calculatePlannedActions();
-
-            //считаем resulting_actions
-//            $this->calculateResultingActions();
-
-            //расставляем категории
-            $this->setCategories();
+            $this->calculateAllData();
 
             $this->info('Подсчёт окончен!');
             return CommandAlias::SUCCESS;
@@ -52,131 +45,11 @@ class CalculateDataForCommonDatabase extends Command
     }
 
     /**
-     * Подсчёт planned_actions
      * @throws \Exception
      */
-    private function calculatePlannedActions()
+    private function calculateAllData()
     {
-        $this->info('Подсчёт planned_actions...');
-
-        $processed = 0;
-
-        CommonDatabase::query()
-            ->select('email', 'mt_user_id')
-            ->chunk($this->chunk, function ($users) use (&$processed) {
-                $batch = [];
-                $emails = $users->pluck('email')->toArray();
-                $mtUserIds = $users->pluck('mt_user_id')->toArray();
-
-                //групповой запрос для actions_mt (уникальные сочетания activity_id и email)
-                $actionsCounts = ActionMT::query()
-                    ->whereIn('email', $emails)
-                    ->select('email', DB::raw('COUNT(DISTINCT activity_id) as count'))
-                    ->groupBy('email')
-                    ->get()
-                    ->keyBy('email');
-
-                //групповой запрос для project_touches_mt touch_type !== 'verification'
-                $touchesCounts = ProjectTouchMT::query()
-                    ->whereIn('mt_user_id', $mtUserIds)
-                    ->where('touch_type', '!=', 'verification')
-                    ->select('mt_user_id', DB::raw('COUNT(*) as count'))
-                    ->groupBy('mt_user_id')
-                    ->get()
-                    ->keyBy('mt_user_id');
-
-                foreach ($users as $user) {
-                    $actionsCount = $actionsCounts[$user->email]->count ?? 0;
-                    $touchesCount = $touchesCounts[$user->mt_user_id]->count ?? 0;
-
-                    $batch[] = [
-                        'email' => $user->email,
-                        'planned_actions' => $actionsCount + $touchesCount
-                    ];
-                }
-
-                if (!empty($batch)) {
-                    $this->withTableLock('common_database', function () use ($batch) {
-                        CommonDatabase::query()->upsert(
-                            $batch,
-                            ['email'],
-                            ['planned_actions']
-                        );
-                    });
-                }
-
-                $processed += count($batch);
-                $this->info("Обработано {$processed} записей для planned_actions");
-            });
-    }
-
-    /**
-     * Подсчёт resulting_actions
-     * @throws \Exception
-     */
-    private function calculateResultingActions()
-    {
-        $this->info('Подсчёт resulting_actions...');
-
-        $processed = 0;
-
-        CommonDatabase::query()
-            ->select('email', 'mt_user_id')
-            ->chunk($this->chunk, function ($users) use (&$processed) {
-                $batch = [];
-                $emails = $users->pluck('email')->toArray();
-                $mtUserIds = $users->pluck('mt_user_id')->toArray();
-
-                //групповой запрос для actions_mt с result > 0
-                $actionsCounts = ActionMT::query()
-                    ->whereIn('email', $emails)
-                    ->where('result', '>', 0)
-                    ->select('email', DB::raw('COUNT(DISTINCT activity_id) as count'))
-                    ->groupBy('email')
-                    ->get()
-                    ->keyBy('email');
-
-                //групповой запрос для project_touches_mt с status === true
-                $touchesCounts = ProjectTouchMT::query()
-                    ->whereIn('mt_user_id', $mtUserIds)
-                    ->where('status', true)
-                    ->select('mt_user_id', DB::raw('COUNT(*) as count'))
-                    ->groupBy('mt_user_id')
-                    ->get()
-                    ->keyBy('mt_user_id');
-
-                foreach ($users as $user) {
-                    $actionsCount = $actionsCounts[$user->email]->count ?? 0;
-                    $touchesCount = $touchesCounts[$user->mt_user_id]->count ?? 0;
-
-                    $batch[] = [
-                        'email' => $user->email,
-                        'resulting_actions' => $actionsCount + $touchesCount
-                    ];
-                }
-
-                if (!empty($batch)) {
-                    $this->withTableLock('common_database', function () use ($batch) {
-                        CommonDatabase::query()->upsert(
-                            $batch,
-                            ['email'],
-                            ['resulting_actions']
-                        );
-                    });
-                }
-
-                $processed += count($batch);
-                $this->info("Обработано {$processed} записей для resulting_actions");
-            });
-    }
-
-    /**
-     * Расставляем категории для каждого пользователя
-     * @throws \Exception
-     */
-    private function setCategories()
-    {
-        $this->info('Расстановка категорий...');
+        $this->info('Подсчёт данных...');
 
         $processed = 0;
 
@@ -187,14 +60,19 @@ class CalculateDataForCommonDatabase extends Command
                 $emails = $users->pluck('email')->toArray();
                 $mtUserIds = $users->pluck('mt_user_id')->toArray();
 
-                //получаем категории для всех пользователей в чанке
+                $plannedActions = $this->getPlannedActions($emails, $mtUserIds);
+                $resultingActions = $this->getResultingActions($emails, $mtUserIds);
                 $categories = $this->getCategories($users, $emails, $mtUserIds);
 
                 foreach ($users as $user) {
+                    $plannedCount = $plannedActions[$user->email] ?? 0;
+                    $resultingCount = $resultingActions[$user->email] ?? 0;
                     $category = $categories[$user->email] ?? 'D';
 
                     $batch[] = [
                         'email' => $user->email,
+                        'planned_actions' => $plannedCount,
+                        'resulting_actions' => $resultingCount,
                         'category' => $category
                     ];
                 }
@@ -204,14 +82,95 @@ class CalculateDataForCommonDatabase extends Command
                         CommonDatabase::query()->upsert(
                             $batch,
                             ['email'],
-                            ['category']
+                            ['planned_actions', 'resulting_actions', 'category']
                         );
                     });
                 }
 
                 $processed += count($batch);
-                $this->info("Обработано {$processed} записей для категорий");
+                $this->info("Обработано {$processed} записей");
             });
+    }
+
+    /**
+     * Получаем planned_actions для группы пользователей
+     */
+    private function getPlannedActions(array $emails, array $mtUserIds): array
+    {
+        $plannedActions = [];
+
+        //групповой запрос для actions_mt (уникальные сочетания activity_id и email)
+        $actionsCounts = ActionMT::query()
+            ->whereIn('email', $emails)
+            ->select('email', DB::raw('COUNT(DISTINCT activity_id) as count'))
+            ->groupBy('email')
+            ->get()
+            ->keyBy('email');
+
+        //групповой запрос для project_touches_mt touch_type !== 'verification'
+        $validMtUserIds = array_filter($mtUserIds, fn($id) => !is_null($id));
+        $touchesCounts = [];
+
+        if (!empty($validMtUserIds)) {
+            $touchesCounts = ProjectTouchMT::query()
+                ->whereIn('mt_user_id', $validMtUserIds)
+                ->where('touch_type', '!=', 'verification')
+                ->select('mt_user_id', DB::raw('COUNT(*) as count'))
+                ->groupBy('mt_user_id')
+                ->get()
+                ->keyBy('mt_user_id');
+        }
+
+        foreach ($emails as $index => $email) {
+            $actionsCount = $actionsCounts[$email]->count ?? 0;
+            $mtUserId = $mtUserIds[$index] ?? null;
+            $touchesCount = $mtUserId ? ($touchesCounts[$mtUserId]->count ?? 0) : 0;
+
+            $plannedActions[$email] = $actionsCount + $touchesCount;
+        }
+
+        return $plannedActions;
+    }
+
+    /**
+     * Получаем resulting_actions для группы пользователей
+     */
+    private function getResultingActions(array $emails, array $mtUserIds): array
+    {
+        $resultingActions = [];
+
+        //групповой запрос для actions_mt с result > 0
+        $actionsCounts = ActionMT::query()
+            ->whereIn('email', $emails)
+            ->where('result', '>', 0)
+            ->select('email', DB::raw('COUNT(DISTINCT activity_id) as count'))
+            ->groupBy('email')
+            ->get()
+            ->keyBy('email');
+
+        //групповой запрос для project_touches_mt с status === true
+        $validMtUserIds = array_filter($mtUserIds, fn($id) => !is_null($id));
+        $touchesCounts = [];
+
+        if (!empty($validMtUserIds)) {
+            $touchesCounts = ProjectTouchMT::query()
+                ->whereIn('mt_user_id', $validMtUserIds)
+                ->where('status', true)
+                ->select('mt_user_id', DB::raw('COUNT(*) as count'))
+                ->groupBy('mt_user_id')
+                ->get()
+                ->keyBy('mt_user_id');
+        }
+
+        foreach ($emails as $index => $email) {
+            $actionsCount = $actionsCounts[$email]->count ?? 0;
+            $mtUserId = $mtUserIds[$index] ?? null;
+            $touchesCount = $mtUserId ? ($touchesCounts[$mtUserId]->count ?? 0) : 0;
+
+            $resultingActions[$email] = $actionsCount + $touchesCount;
+        }
+
+        return $resultingActions;
     }
 
     /**
@@ -247,7 +206,7 @@ class CalculateDataForCommonDatabase extends Command
     }
 
     /**
-     * Проверяет условия для категории A
+     * Проверяем условия для категории A
      */
     private function getCategoryAConditions($emails, $mtUserIds, $oneYearAgo): array
     {
@@ -267,13 +226,11 @@ class CalculateDataForCommonDatabase extends Command
             ->toArray();
 
         //условие 2: видеовизиты в project_touches_mt за последний год + registration_date заполнено
-        $validMtUserIds = array_filter($mtUserIds, function ($id) { //фильтруем mtUserIds от null значений
-            return !is_null($id);
-        });
+        $validMtUserIds = array_filter($mtUserIds, fn($id) => !is_null($id));
 
         if (!empty($validMtUserIds)) {
             $videoTouchesUsers = ProjectTouchMT::query()
-                ->whereIn('project_touches_mt.mt_user_id', $validMtUserIds) // уточняем таблицу
+                ->whereIn('project_touches_mt.mt_user_id', $validMtUserIds)
                 ->where('touch_type', 'video')
                 ->where('status', true)
                 ->where('date_time', '>=', $oneYearAgo)
@@ -299,7 +256,7 @@ class CalculateDataForCommonDatabase extends Command
     }
 
     /**
-     * Проверяет условия для категории B
+     * Проверяем условия для категории B
      */
     private function getCategoryBConditions($users, $emails, $oneYearAgo): array
     {
