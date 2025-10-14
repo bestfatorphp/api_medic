@@ -34,10 +34,13 @@ class CalculateDataForCommonDatabase extends Command
             $this->info("Начинаем подсчёт. Чанк {$this->chunk}...");
 
             //считаем planned_actions
-            $this->calculatePlannedActions();
+//            $this->calculatePlannedActions();
 
             //считаем resulting_actions
-            $this->calculateResultingActions();
+//            $this->calculateResultingActions();
+
+            //расставляем категории
+            $this->setCategories();
 
             $this->info('Подсчёт окончен!');
             return CommandAlias::SUCCESS;
@@ -50,6 +53,7 @@ class CalculateDataForCommonDatabase extends Command
 
     /**
      * Подсчёт planned_actions
+     * @throws \Exception
      */
     private function calculatePlannedActions()
     {
@@ -108,6 +112,7 @@ class CalculateDataForCommonDatabase extends Command
 
     /**
      * Подсчёт resulting_actions
+     * @throws \Exception
      */
     private function calculateResultingActions()
     {
@@ -163,5 +168,193 @@ class CalculateDataForCommonDatabase extends Command
                 $processed += count($batch);
                 $this->info("Обработано {$processed} записей для resulting_actions");
             });
+    }
+
+    /**
+     * Расставляем категории для каждого пользователя
+     * @throws \Exception
+     */
+    private function setCategories()
+    {
+        $this->info('Расстановка категорий...');
+
+        $processed = 0;
+
+        CommonDatabase::query()
+            ->select('email', 'mt_user_id', 'specialization', 'registration_date')
+            ->chunk($this->chunk, function ($users) use (&$processed) {
+                $batch = [];
+                $emails = $users->pluck('email')->toArray();
+                $mtUserIds = $users->pluck('mt_user_id')->toArray();
+
+                //получаем категории для всех пользователей в чанке
+                $categories = $this->getCategories($users, $emails, $mtUserIds);
+
+                foreach ($users as $user) {
+                    $category = $categories[$user->email] ?? 'D';
+
+                    $batch[] = [
+                        'email' => $user->email,
+                        'category' => $category
+                    ];
+                }
+
+                if (!empty($batch)) {
+                    $this->withTableLock('common_database', function () use ($batch) {
+                        CommonDatabase::query()->upsert(
+                            $batch,
+                            ['email'],
+                            ['category']
+                        );
+                    });
+                }
+
+                $processed += count($batch);
+                $this->info("Обработано {$processed} записей для категорий");
+            });
+    }
+
+    /**
+     * Получаем категории для группы пользователей
+     */
+    private function getCategories($users, $emails, $mtUserIds): array
+    {
+        $oneYearAgo = now()->subDays(365);
+        $categories = [];
+
+        //проверка условий для категории A
+        $categoryAConditions = $this->getCategoryAConditions($emails, $mtUserIds, $oneYearAgo);
+
+        //проверка условий для категории B
+        $categoryBConditions = $this->getCategoryBConditions($users, $emails, $oneYearAgo);
+
+        //определяем категории для каждого пользователя
+        foreach ($users as $user) {
+            $category = 'D';
+
+            if ($categoryAConditions[$user->email] ?? false) {
+                $category = 'A';
+            } elseif ($categoryBConditions[$user->email] ?? false) {
+                $category = 'B';
+            } elseif (!empty($user->registration_date)) {
+                $category = 'C';
+            }
+
+            $categories[$user->email] = $category;
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Проверяет условия для категории A
+     */
+    private function getCategoryAConditions($emails, $mtUserIds, $oneYearAgo): array
+    {
+        $conditions = [];
+
+        //условие 1: действия в actions_mt с типами Лонгрид, Квиз, Видеовизит за последний год
+        $actionsMtUsers = ActionMT::query()
+            ->whereIn('email', $emails)
+            ->where('date_time', '>=', $oneYearAgo)
+            ->whereHas('activity', function ($query) {
+                $query->whereIn('type', ['Лонгрид', 'Квиз', 'Видеовизит']);
+            })
+            ->select('email')
+            ->groupBy('email')
+            ->get()
+            ->pluck('email')
+            ->toArray();
+
+        //условие 2: видеовизиты в project_touches_mt за последний год + registration_date заполнено
+        $validMtUserIds = array_filter($mtUserIds, function ($id) { //фильтруем mtUserIds от null значений
+            return !is_null($id);
+        });
+
+        if (!empty($validMtUserIds)) {
+            $videoTouchesUsers = ProjectTouchMT::query()
+                ->whereIn('project_touches_mt.mt_user_id', $validMtUserIds) // уточняем таблицу
+                ->where('touch_type', 'video')
+                ->where('status', true)
+                ->where('date_time', '>=', $oneYearAgo)
+                ->join('common_database', 'project_touches_mt.mt_user_id', '=', 'common_database.mt_user_id')
+                ->whereNotNull('common_database.registration_date')
+                ->select('common_database.email')
+                ->groupBy('common_database.email')
+                ->get()
+                ->pluck('email')
+                ->toArray();
+
+            //объединяем условия для категории A
+            $categoryAUsers = array_unique(array_merge($actionsMtUsers, $videoTouchesUsers));
+        } else {
+            $categoryAUsers = $actionsMtUsers;
+        }
+
+        foreach ($categoryAUsers as $email) {
+            $conditions[$email] = true;
+        }
+
+        return $conditions;
+    }
+
+    /**
+     * Проверяет условия для категории B
+     */
+    private function getCategoryBConditions($users, $emails, $oneYearAgo): array
+    {
+        $conditions = [];
+
+        //условие 1: заполнено поле specialization
+        foreach ($users as $user) {
+            if (!empty($user->specialization)) {
+                $conditions[$user->email] = true;
+            }
+        }
+
+        //если уже нашли условие для всех пользователей, дальше не проверяем
+        if (count($conditions) === count($emails)) {
+            return $conditions;
+        }
+
+        //условие 2: участия в активностях types conference, congress, school, webinar, Мероприятие
+        $emailsWithoutCondition = array_diff($emails, array_keys($conditions));
+        if (!empty($emailsWithoutCondition)) {
+            $activitiesUsers = ActionMT::query()
+                ->whereIn('email', $emailsWithoutCondition)
+                ->where('date_time', '>=', $oneYearAgo)
+                ->whereHas('activity', function ($query) {
+                    $query->whereIn('type', ['conference', 'congress', 'school', 'webinar', 'Мероприятие']);
+                })
+                ->select('email')
+                ->groupBy('email')
+                ->get()
+                ->pluck('email')
+                ->toArray();
+
+            foreach ($activitiesUsers as $email) {
+                $conditions[$email] = true;
+            }
+        }
+
+        //условие 3: авторизация на портале за последние 365 дней
+        $emailsWithoutCondition = array_diff($emails, array_keys($conditions));
+        if (!empty($emailsWithoutCondition)) {
+            $authorizedUsers = CommonDatabase::query()
+                ->whereIn('email', $emailsWithoutCondition)
+                ->whereNotNull('last_auth_date')
+                ->where('last_auth_date', '>=', $oneYearAgo)
+                ->select('email')
+                ->groupBy('email')
+                ->get()
+                ->pluck('email')
+                ->toArray();
+
+            foreach ($authorizedUsers as $email) {
+                $conditions[$email] = true;
+            }
+        }
+
+        return $conditions;
     }
 }
