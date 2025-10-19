@@ -156,6 +156,7 @@ class ImportCampaignsIntellectDialog extends Command
      * Обрабатываем кампании, если нет создаём... формируем пакет кампаний
      * @param array $message
      * @param array $campaignsBatch
+     * @throws \Exception
      */
     private function processCampaignBatch(array $message, array &$campaignsBatch): void
     {

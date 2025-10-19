@@ -179,7 +179,8 @@ class ImportCampaignsSandSay extends Common
 
 
             foreach ($stats as $stat) {
-                $email = $stat['member.email'];
+                $email = strtolower($stat['member.email']);
+                $stat['member.email'] = $email;
 
                 $email_status = $stat['member.haslock'] == '0' ? 'active' : 'blocked';
 
@@ -296,6 +297,7 @@ class ImportCampaignsSandSay extends Common
      * Пакетная вставка
      * @param array $batchContacts
      * @param array $batchCommonDB
+     * @throws \Exception
      */
     private function saveBatchData(array &$batchContacts, array &$batchCommonDB): void
     {
@@ -327,6 +329,7 @@ class ImportCampaignsSandSay extends Common
     /**
      * Сохраняем/обновляем рассылку
      * @param array $statData
+     * @throws \Exception
      */
     private function createOrUpdateIssue(array $statData): void
     {

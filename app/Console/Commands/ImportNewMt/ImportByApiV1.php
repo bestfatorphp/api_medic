@@ -812,6 +812,7 @@ class ImportByApiV1 extends Common
     /**
      * Вставляем действия пользователей пакетом
      * @param array $batchActions
+     * @throws \Exception
      */
     private function insertActions(array $batchActions)
     {

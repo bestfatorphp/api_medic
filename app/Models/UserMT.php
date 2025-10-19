@@ -72,7 +72,7 @@ class UserMT extends Model
      */
     public function actions_mt(): HasMany
     {
-        return $this->hasMany(ActionMT::class, 'mt_user_id');
+        return $this->hasMany(ActionMT::class, 'email');
     }
 
     /**
