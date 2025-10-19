@@ -182,7 +182,8 @@ class ImportByApiV2 extends Common
     private function processUserData(array $touchData, array &$usersMTBatch, array &$commonDBBatch, array &$processedEmails): void
     {
         $userData = $touchData['user'];
-        $email = $userData['email'];
+        $email = strtolower($userData['email']);
+        $userData['email'] = $email;
 
         if (!in_array($email, $processedEmails)) {
             $fullName = trim(implode(' ', array_filter([
@@ -199,7 +200,8 @@ class ImportByApiV2 extends Common
 
     private function processDoctorsData(array $contact, array &$doctorsBatch, array &$usersMTDoctorBatch, array &$commonDBDoctorBatch, array &$processedDoctorsEmails): void
     {
-        $email = $contact['email'];
+        $email = strtolower($contact['email']);
+        $contact['email'] = $email;
 
         if (!in_array($email, $processedDoctorsEmails)) {
             $fullName = $contact['name'];
@@ -336,6 +338,7 @@ class ImportByApiV2 extends Common
      * Вставка пользователей в таблицу users_mt
      * @param array $usersMTBatch Массив пользователей
      * @param array $commonDBBatch Ссылка на массив для common_database
+     * @throws \Exception
      */
     private function processUsersInsert(array $usersMTBatch, array &$commonDBBatch, bool $isDoctors = false): void
     {
@@ -369,8 +372,9 @@ class ImportByApiV2 extends Common
 
     /**
      * Вставка проектов и получение их ID
-     * @param array $projectsBatch      Массив проектов
+     * @param array $projectsBatch Массив проектов
      * @return array                    Маппинг ключей проектов на их ID
+     * @throws \Exception
      */
     private function processProjectsInsert(array $projectsBatch): array
     {

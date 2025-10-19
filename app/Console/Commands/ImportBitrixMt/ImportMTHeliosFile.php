@@ -6,7 +6,6 @@ use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\ActivityMT;
 use App\Models\CommonDatabase;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Symfony\Component\Panther\Client;
 
@@ -171,6 +170,8 @@ class ImportMTHeliosFile extends Common
                             $this->warn("Пропущена некорректная строка с невалидным email: {$email}");
                             continue;
                         }
+
+                        $email = strtolower($email);
 
                         $commonDb = $this->withTableLock('common_database', function () use ($email, $userBitrixId) {
                             return CommonDatabase::updateOrCreateWithMutators(

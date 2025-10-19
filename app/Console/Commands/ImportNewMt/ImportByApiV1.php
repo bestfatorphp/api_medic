@@ -125,6 +125,9 @@ class ImportByApiV1 extends Common
                         continue;
                     }
 
+                    $email = strtolower($email);
+                    $userData['email'] = $email;
+
                     if (in_array($email, $EMAILS)) {
                         continue;
                     }
@@ -430,7 +433,7 @@ class ImportByApiV1 extends Common
         );
 
         return [
-            'email' => $fcData['user']['email'],
+            'email' => strtolower($fcData['user']['email']),
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
             'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),

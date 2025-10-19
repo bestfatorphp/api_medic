@@ -51,7 +51,7 @@ class Doctor extends Model
     public function setEmailAttribute($value)
     {
         if ($this->shouldUpdateFieldIfNull($value, $this->attributes['email'] ?? null)) {
-            $this->attributes['email'] = $value;
+            $this->attributes['email'] = strtolower($value);
         }
     }
 

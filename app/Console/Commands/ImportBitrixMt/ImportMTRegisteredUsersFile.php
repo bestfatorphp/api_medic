@@ -318,6 +318,9 @@ class ImportMTRegisteredUsersFile extends Common
                     continue;
                 }
 
+                $email = strtolower($row[7]);
+                $row[7] = $email;
+
                 if (in_array($email, $EMAILS)) {
                     $this->warn("Дубликат - $email");
                     continue;

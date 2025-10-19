@@ -44,6 +44,10 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
+        $schedule->command('users:merge-duplicates')
+            ->dailyAt('14:10')
+            ->sendOutputTo(storage_path("{$commonPath}users-merge-duplicates.log"));
+
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
        $schedule->command('import:id-campaigns')
