@@ -190,7 +190,7 @@ class ImportByApiV1 extends Common
                 UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
-                    ['new_mt_id', 'old_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city']
+                    ['new_mt_id', 'old_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city', 'last_login']
                 );
             });
 
@@ -211,7 +211,7 @@ class ImportByApiV1 extends Common
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'mt_user_id', 'new_mt_id', 'old_mt_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city']
+                    ['full_name', 'mt_user_id', 'new_mt_id', 'old_mt_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city', 'last_login']
                 );
             });
         });
@@ -629,6 +629,7 @@ class ImportByApiV1 extends Common
     /**
      * Обрабатываем данные из временной таблицы квизов
      * @return int
+     * @throws \Exception
      */
     private function processTempQuizData(): int
     {
