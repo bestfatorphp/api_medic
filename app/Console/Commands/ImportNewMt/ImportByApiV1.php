@@ -192,7 +192,7 @@ class ImportByApiV1 extends Common
                     ['email'],
                     ['new_mt_id', 'old_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city', 'last_login']
                 );
-            });
+            }, true);
 
             $emails = array_column($usersMTBatch, 'email');
             $usersIdByEmail = UserMT::query()
@@ -213,7 +213,7 @@ class ImportByApiV1 extends Common
                     ['email'],
                     ['full_name', 'mt_user_id', 'new_mt_id', 'old_mt_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city', 'last_login']
                 );
-            });
+            }, true);
         });
     }
 
