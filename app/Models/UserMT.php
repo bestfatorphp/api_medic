@@ -35,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string                 $uf_utm_term            utm метка
  * @property string                 $uf_utm_campaign        utm метка
  * @property string                 $uf_utm_content         utm метка
- * @property Carbon                 $last_auth_date         Последняя авторизация на портале
+ * @property Carbon                 $last_login             Последняя авторизация на портале
  *
  * @property CommonDatabase         $common_database        Общая база
  * @property ActionMT               $actions_mt             Действия МТ

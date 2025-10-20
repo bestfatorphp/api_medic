@@ -41,7 +41,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string                 $email_status           Статус e-mail
  * @property string                 $category               Категория участий
  * @property string                 $source                 Источник
- * @property Carbon                 $last_auth_date         Последняя авторизация на портале
+ * @property Carbon                 $last_login             Последняя авторизация на портале
  *
  * @property UserMT                 $user_mt
  * @property Doctor                 $doctor

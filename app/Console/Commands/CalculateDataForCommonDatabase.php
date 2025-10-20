@@ -299,8 +299,8 @@ class CalculateDataForCommonDatabase extends Command
         if (!empty($emailsWithoutCondition)) {
             $authorizedUsers = CommonDatabase::query()
                 ->whereIn('email', $emailsWithoutCondition)
-                ->whereNotNull('last_auth_date')
-                ->where('last_auth_date', '>=', $oneYearAgo)
+                ->whereNotNull('last_login')
+                ->where('last_login', '>=', $oneYearAgo)
                 ->select('email')
                 ->groupBy('email')
                 ->get()

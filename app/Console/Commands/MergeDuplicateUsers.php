@@ -286,7 +286,7 @@ class MergeDuplicateUsers extends Command
             'gender', 'birth_date', 'registration_website', 'acquisition_tool',
             'acquisition_method', 'username', 'specialization', 'planned_actions',
             'resulting_actions', 'verification_status', 'pharma', 'email_status',
-            'category', 'source', 'last_auth_date'
+            'category', 'source', 'last_login'
         ];
 
         foreach ($fields as $field) {
@@ -312,7 +312,7 @@ class MergeDuplicateUsers extends Command
             'specialty', 'interests', 'phone', 'place_of_employment', 'registration_date',
             'country', 'region', 'city', 'registration_website', 'acquisition_tool',
             'acquisition_method', 'uf_utm_term', 'uf_utm_campaign', 'uf_utm_content',
-            'last_auth_date'
+            'last_login'
         ];
 
         foreach ($fields as $field) {

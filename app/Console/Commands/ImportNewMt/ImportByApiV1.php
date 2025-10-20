@@ -236,7 +236,8 @@ class ImportByApiV1 extends Common
             'specialty' => $userData['speciality'] ?? null,
             'phone' => $userData['phone'] ?? null,
             'place_of_employment' => $userData['workplace'] ?? null,
-            'city' => $userData['city'] ?? null
+            'city' => $userData['city'] ?? null,
+            'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
         ];
     }
 
@@ -262,7 +263,8 @@ class ImportByApiV1 extends Common
             'birth_date' => isset($userData['birthdate']) ? Carbon::parse($userData['birthdate'])->format('Y-m-d H:i:s') : null,
             'specialty' => $userData['speciality'] ?? null,
             'phone' => $userData['phone'] ?? null,
-            'city' => $userData['city'] ?? null
+            'city' => $userData['city'] ?? null,
+            'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
         ];
     }
 
