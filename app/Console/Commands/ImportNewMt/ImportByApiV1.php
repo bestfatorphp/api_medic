@@ -202,7 +202,7 @@ class ImportByApiV1 extends Common
 
             $commonDBBatch = array_map(
                 function ($item) use ($usersIdByEmail) {
-                    $item['mt_user_id'] = $usersIdByEmail[$item['email']];
+                    $item['mt_user_id'] = $usersIdByEmail[$item['email']] ?? null;
                     return $item;
                 },
                 $commonDBBatch
