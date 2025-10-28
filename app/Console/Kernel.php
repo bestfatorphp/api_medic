@@ -62,37 +62,41 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
-            ->dailyAt('01:30')
-            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
-            ->then(function () use ($commonPath) {
-                //создаём и запускаем команду вручную с ожиданием, пока не отработает первая,
-                //т.к. работают на одном порту, парралельная работа невозможна, нужно чтобы осуществился выход из клиента
-                sleep(60);
+//        $schedule->command('import:medtouch-reg-users --chunk=5 --timeout=120')
+//            ->dailyAt('01:30')
+//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-reg-users.log"));
 
-                //удаляем старый файл, если он существует
-                $logFile = storage_path("{$commonPath}import-medtouch-reg-users.log");
-                if (file_exists($logFile)) {
-                    unlink($logFile);
-                }
-
-                $command = new \App\Console\Commands\ImportBitrixMt\ImportMTRegisteredUsersFile();
-                $command->setLaravel(app());
-                $exitCode = $command->run(
-                    new \Symfony\Component\Console\Input\ArrayInput([
-                        '--chunk' => 5,
-                        '--timeout' => 120,
-                        '--need-file' => true,
-                    ]),
-                    new \Symfony\Component\Console\Output\StreamOutput(
-                        fopen($logFile, 'w')
-                    )
-                );
-
-                if ($exitCode !== 0) {
-                    Log::channel('commands')->error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
-                }
-            });
+//       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
+//            ->dailyAt('01:30')
+//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
+//            ->then(function () use ($commonPath) {
+//                //создаём и запускаем команду вручную с ожиданием, пока не отработает первая,
+//                //т.к. работают на одном порту, парралельная работа невозможна, нужно чтобы осуществился выход из клиента
+//                sleep(60);
+//
+//                //удаляем старый файл, если он существует
+//                $logFile = storage_path("{$commonPath}import-medtouch-reg-users.log");
+//                if (file_exists($logFile)) {
+//                    unlink($logFile);
+//                }
+//
+//                $command = new \App\Console\Commands\ImportBitrixMt\ImportMTRegisteredUsersFile();
+//                $command->setLaravel(app());
+//                $exitCode = $command->run(
+//                    new \Symfony\Component\Console\Input\ArrayInput([
+//                        '--chunk' => 5,
+//                        '--timeout' => 120,
+//                        '--need-file' => true,
+//                    ]),
+//                    new \Symfony\Component\Console\Output\StreamOutput(
+//                        fopen($logFile, 'w')
+//                    )
+//                );
+//
+//                if ($exitCode !== 0) {
+//                    Log::channel('commands')->error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
+//                }
+//            });
 
        $schedule->command('calculate:data-common-db')
             ->dailyAt('05:30')
