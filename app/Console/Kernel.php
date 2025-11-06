@@ -62,10 +62,15 @@ class Kernel extends ConsoleKernel
             ->dailyAt('00:30')
             ->sendOutputTo(storage_path("{$commonPath}import-stats-sendsay.log"));
 
-//        $schedule->command('import:medtouch-reg-users --chunk=5 --timeout=120')
-//            ->dailyAt('01:30')
-//            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-reg-users.log"));
+        $schedule->command('calculate:data-common-db')
+            ->dailyAt('01:30')
+            ->sendOutputTo(storage_path("{$commonPath}calculate-data-commondb.log"));
 
+        $schedule->command('import:sendsay-stats-deliv --hasIsSent=1') //собираем за предыдущие сутки + обновляем все где есть is sent
+        ->dailyAt('02:30')
+            ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
+
+        //Команды для битрикса больше не нужны, по ним всё собрано
 //       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->dailyAt('01:30')
 //            ->sendOutputTo(storage_path("{$commonPath}import-medtouch-helios.log"))
@@ -97,14 +102,6 @@ class Kernel extends ConsoleKernel
 //                    Log::channel('commands')->error("Команда import:medtouch-reg-users завершилась с ошибкой (код: {$exitCode})");
 //                }
 //            });
-
-       $schedule->command('calculate:data-common-db')
-            ->dailyAt('05:30')
-            ->sendOutputTo(storage_path("{$commonPath}calculate-data-commondb.log"));
-
-        $schedule->command('import:sendsay-stats-deliv --hasIsSent=1') //собираем за предыдущие сутки + обновляем все где есть is sent
-            ->dailyAt('06:30')
-            ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
 
 
         //разовая команда (после оплаты аккаунта собрать)
