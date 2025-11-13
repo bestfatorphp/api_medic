@@ -74,10 +74,10 @@ class ImportByApiV1 extends Common
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
-//            $this->processUserData($queryParams);
+            $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
                 $this->processEventsData($queryParams);
-//                $this->processQuizData($queryParams);
+                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -321,12 +321,7 @@ class ImportByApiV1 extends Common
                     $activity = $this->withTableLock('activities_mt', function () use ($eventData, $additionalEventName) {
                         $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
                         return ActivityMT::updateOrCreate(
-                            [
-                                'type' => $activityData['type'],
-                                'name' => $activityData['name'],
-                                'date_time' => $activityData['date_time'],
-                                'is_online' => $activityData['is_online'],
-                            ],
+                            $activityData,
                             $activityData
                         );
                     });
@@ -346,7 +341,7 @@ class ImportByApiV1 extends Common
                 }
 
                 if (count($batchActions) >= self::BATCH_SIZE) {
-//                    $this->insertActions($batchActions);
+                    $this->insertActions($batchActions);
                     $batchActions = [];
                     gc_mem_caches(); //очищаем кэши памяти Zend Engine
                 }
@@ -365,7 +360,7 @@ class ImportByApiV1 extends Common
         }
 
         if (count($batchActions) > 0) {
-//            $this->insertActions($batchActions);
+            $this->insertActions($batchActions);
             $batchActions = [];
             gc_mem_caches(); //очищаем кэши памяти Zend Engine
         }
