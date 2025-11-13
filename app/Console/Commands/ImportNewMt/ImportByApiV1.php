@@ -74,10 +74,10 @@ class ImportByApiV1 extends Common
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
-            $this->processUserData($queryParams);
+//            $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
                 $this->processEventsData($queryParams);
-                $this->processQuizData($queryParams);
+//                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -320,8 +320,13 @@ class ImportByApiV1 extends Common
                     }
                     $activity = $this->withTableLock('activities_mt', function () use ($eventData, $additionalEventName) {
                         $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
-                        return ActivityMT::firstOrCreate(
-                            $activityData,
+                        return ActivityMT::updateOrCreate(
+                            [
+                                'type' => $activityData['type'],
+                                'name' => $activityData['name'],
+                                'date_time' => $activityData['date_time'],
+                                'is_online' => $activityData['is_online'],
+                            ],
                             $activityData
                         );
                     });
@@ -341,7 +346,7 @@ class ImportByApiV1 extends Common
                 }
 
                 if (count($batchActions) >= self::BATCH_SIZE) {
-                    $this->insertActions($batchActions);
+//                    $this->insertActions($batchActions);
                     $batchActions = [];
                     gc_mem_caches(); //очищаем кэши памяти Zend Engine
                 }
@@ -360,13 +365,13 @@ class ImportByApiV1 extends Common
         }
 
         if (count($batchActions) > 0) {
-            $this->insertActions($batchActions);
+//            $this->insertActions($batchActions);
             $batchActions = [];
             gc_mem_caches(); //очищаем кэши памяти Zend Engine
         }
 
         //формируем действия участников не посетивших мерроприятие
-        $this->processEventRegisteredUsers($eventsInfo);
+//        $this->processEventRegisteredUsers($eventsInfo);
 
         $this->info("Извлечено $totalProcessed событий");
     }
@@ -405,7 +410,7 @@ class ImportByApiV1 extends Common
      * @param string $additionalEventName
      * @return array
      */
-    #[ArrayShape(['type' => "mixed", 'name' => "mixed", 'date_time' => "string", 'is_online' => "bool"])]
+    #[ArrayShape(['type' => "mixed", 'name' => "string", 'date_time' => "string", 'is_online' => "bool", 'event_id' => "mixed"])]
     private function prepareActivityEventData(array $activityData, string $additionalEventName): array
     {
         return [
@@ -413,6 +418,7 @@ class ImportByApiV1 extends Common
             'name' => $activityData['name'] . $additionalEventName,
             'date_time' => Carbon::parse($activityData['started_at'])->format('Y-m-d H:i:s'),
             'is_online' => in_array($activityData['format'], ['hybrid', 'online']),
+            'event_id' => $activityData['id']
         ];
     }
 

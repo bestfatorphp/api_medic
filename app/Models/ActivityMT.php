@@ -16,6 +16,7 @@ use Carbon\Carbon;
  * @property string         $name               Название активности
  * @property Carbon         $date_time          Дата и время активности
  * @property boolean        $is_online          Очное
+ * @property boolean        $event_id           ID мероприятия на стороне МТ
  */
 class ActivityMT extends Model
 {
