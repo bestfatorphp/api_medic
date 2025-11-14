@@ -74,10 +74,11 @@ class ImportByApiV1 extends Common
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
-            $this->processUserData($queryParams);
+//            $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
+//                $this->processEventsFCData($queryParams);
                 $this->processEventsData($queryParams);
-                $this->processQuizData($queryParams);
+//                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -269,12 +270,12 @@ class ImportByApiV1 extends Common
     }
 
     /**
-     * Обрабатываем события (общая таблица - activities_mt)
+     * Обрабатываем face cast события (общая таблица - activities_mt)
      * @throws \Exception
      */
-    private function processEventsData(array $queryParams)
+    private function processEventsFCData(array $queryParams)
     {
-        $this->info('Извлекаем события...');
+        $this->info('Извлекаем события FaceCast...');
 
         $hasMorePages = true;
         $page = 1;
@@ -284,7 +285,6 @@ class ImportByApiV1 extends Common
         $queryParams['order'] = 'event_id';
 
         $batchActions = [];
-        $eventsInfo = [];
 
         while ($hasMorePages) {
             try {
@@ -296,6 +296,7 @@ class ImportByApiV1 extends Common
 
                 //обработка данных законченных событий
                 foreach ($data as $fcData) {
+                    $this->info("Извлекаю фейскаст...");
                     /** @var UserMT $user */
                     $user = UserMT::query()->where('new_mt_id', $fcData['user']['id'])->exists();
                     if (!$user) {
@@ -318,20 +319,35 @@ class ImportByApiV1 extends Common
                     if ($issetRoom) {
                         $additionalEventName .= 'room - ' . $fcData['room']['name'] . ')';
                     }
-                    $activity = $this->withTableLock('activities_mt', function () use ($eventData, $additionalEventName) {
-                        $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
-                        return ActivityMT::updateOrCreate(
-                            $activityData,
-                            $activityData
-                        );
-                    });
+                    $activityData = $this->prepareActivityEventData($eventData, $additionalEventName);
 
-                    if (!isset($eventsInfo[$eventId])) {
-                        $eventsInfo[$eventId] = [
-                            'activity_id' => $activity->id,
-                            'format' => $eventData['format'],
-                            'started_at' => $eventData['started_at']
-                        ];
+                    $activity = null;
+
+                    /** @var ActivityMT $activity */
+                    $activity = ActivityMT::query()
+                        ->where('name', '=', $eventData['name'])
+                        ->where('event_id', '=', $activityData['event_id'])
+                        ->first();
+
+                    if ($activity) {
+                        $this->withTableLock('activities_mt', function () use ($activity, $activityData) {
+                            $activity->update($activityData);
+                        });
+                    } else {
+                        $activity = ActivityMT::query()
+                            ->where('name', '=', $activityData['name'])
+                            ->where('event_id', '=', $activityData['event_id'])
+                            ->first();
+                        if (!$activity) {
+                            $activity = $this->withTableLock('activities_mt', function () use ($activityData) {
+                                return ActivityMT::create($activityData);
+                            });
+                        }
+                    }
+
+                    if (!$activity) {
+                        $this->error("Не удалось создать/найти активность для события $eventId");
+                        continue;
                     }
 
                     //подготавливае действия
@@ -365,37 +381,98 @@ class ImportByApiV1 extends Common
             gc_mem_caches(); //очищаем кэши памяти Zend Engine
         }
 
-        //формируем действия участников не посетивших мерроприятие
-//        $this->processEventRegisteredUsers($eventsInfo);
+        $this->info("Извлечено $totalProcessed событий");
+    }
+
+    /**
+     * @throws \Exception
+     */
+    private function processEventsData(array $queryParams)
+    {
+        $this->info('Извлекаем события...');
+
+        $hasMorePages = true;
+        $page = 1;
+        $totalProcessed = 0;
+
+        $queryParams = [];
+
+        $queryParams['orderBy'] = 'asc';
+        $queryParams['order'] = 'id';
+
+
+        while ($hasMorePages) {
+            try {
+                $response = $this->getData('outer/event', $queryParams, $page);
+
+                if (empty($response) || empty($data = $response['data'])) {
+                    break;
+                }
+
+                //обработка данных законченных событий
+                foreach ($data as $eventData) {
+                    $eventId = $eventData['id'];
+
+                    /** @var ActivityMT $activity */
+                    $activity = ActivityMT::query()->where('event_id', '=', $eventId)->first();
+
+                    if (!$activity) {
+                        $activityData = $this->prepareActivityEventData($eventData);
+
+                        $activity = $this->withTableLock('activities_mt', function () use ($eventData, $activityData) {
+                            return ActivityMT::create($activityData);
+                        });
+                    }
+
+                    $this->processEventRegisteredUsers($eventId, [
+                        'activity_id' => $activity->id,
+                        'format' => $eventData['format'],
+                        'started_at' => $eventData['started_at']
+                    ]);
+
+                    $totalProcessed++;
+                }
+
+                //проверяем, есть ли следующая страница
+                $hasMorePages = !empty($response['next_page_url']);
+                $page++;
+
+                //задержка между запросами
+                sleep(1);
+
+            } catch (\Exception $e) {
+                $this->error("Ошибка получения данных: " . $e->getMessage());
+                throw $e;
+            }
+        }
 
         $this->info("Извлечено $totalProcessed событий");
     }
 
     /**
      * Формируем действия участников не посетивших мерроприятие (duration 0, result 0)
-     * @param array $eventsInfo
+     * @param int $eventId
+     * @param array $data
      * @throws \Exception
      */
-    private function processEventRegisteredUsers(array $eventsInfo)
+    private function processEventRegisteredUsers(int $eventId, array $data)
     {
-        foreach ($eventsInfo as $eventId => $data) {
-            $format = $data['format'];
-            $actionData = [
-                'activity_id' => $data['activity_id'],
-                'date_time' => Carbon::parse($data['started_at'])->format('Y-m-d H:i:s'),
-                'duration' => 0,
-                'result' => 0
-            ];
+        $format = $data['format'];
+        $actionData = [
+            'activity_id' => $data['activity_id'],
+            'date_time' => Carbon::parse($data['started_at'])->format('Y-m-d H:i:s'),
+            'duration' => 0,
+            'result' => 0
+        ];
 
-            //формируем действия участников offline
-            if (in_array($format, ['hybrid', 'offline'])) {
-                $this->processActionsEvent('offline', $eventId, $actionData);
-            }
+        //формируем действия участников offline
+        if (in_array($format, ['hybrid', 'offline'])) {
+            $this->processActionsEvent('offline', $eventId, $actionData);
+        }
 
-            //формируем действия участников online
-            if (in_array($format, ['hybrid', 'online'])) {
-                $this->processActionsEvent('online', $eventId, $actionData);
-            }
+        //формируем действия участников online
+        if (in_array($format, ['hybrid', 'online'])) {
+            $this->processActionsEvent('online', $eventId, $actionData);
         }
     }
 
@@ -406,12 +483,12 @@ class ImportByApiV1 extends Common
      * @return array
      */
     #[ArrayShape(['type' => "mixed", 'name' => "string", 'date_time' => "string", 'is_online' => "bool", 'event_id' => "mixed"])]
-    private function prepareActivityEventData(array $activityData, string $additionalEventName): array
+    private function prepareActivityEventData(array $activityData, string $additionalEventName = ''): array
     {
         return [
             'type' => $activityData['type'],
             'name' => $activityData['name'] . $additionalEventName,
-            'date_time' => Carbon::parse($activityData['started_at'])->format('Y-m-d H:i:s'),
+            'date_time' => $activityData['started_at'] ? Carbon::parse($activityData['started_at'])->format('Y-m-d H:i:s') : null,
             'is_online' => in_array($activityData['format'], ['hybrid', 'online']),
             'event_id' => $activityData['id']
         ];
@@ -446,7 +523,7 @@ class ImportByApiV1 extends Common
     }
 
     /**
-     * Обрабатываем действия пользователей в событии
+     * Регистрация пользователей на событие
      * @param string $format            Формат события (online, offline)
      * @param int $eventId              ID события
      * @param array $actionMTData       Стартовые данные действия для сохранения
@@ -454,7 +531,9 @@ class ImportByApiV1 extends Common
      */
     private function processActionsEvent(string $format, int $eventId, array $actionMTData)
     {
-        $this->info("Извлекаем действия пользователей не участвовавших в мерроприятии в событии с id $eventId, формат $format...");
+        $this->info("Извлекаем регистрации пользователей в событии с id $eventId, формат $format...");
+
+        $actionMTData['format'] = $format;
 
         $queryParams = [
             'pageSize' => $this->pageSize,
@@ -483,11 +562,6 @@ class ImportByApiV1 extends Common
                         $user = UserMT::query()->where('new_mt_id', $newMTId)->select(['id', 'email'])->first();
                         if (!$user) {
                             $this->info("Не найден пользователь. Пропускаю...");
-                            continue;
-                        }
-
-                        if (ActionMT::query()->where('mt_user_id', $newMTId)->where('activity_id', $actionMTData['activity_id'])->exists()) {
-                            $this->info("Пользователь уже имеет запись об активности. Пропускаю...");
                             continue;
                         }
 
@@ -527,7 +601,7 @@ class ImportByApiV1 extends Common
             throw $e;
         }
 
-        $this->info("Извлечено $totalProcessed пользователей, не принимавших участие");
+        $this->info("Извлечено $totalProcessed регистраций");
     }
 
     /**
