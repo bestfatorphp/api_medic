@@ -74,11 +74,11 @@ class ImportByApiV1 extends Common
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало импорта');
-//            $this->processUserData($queryParams);
+            $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
-//                $this->processEventsFCData($queryParams);
+                $this->processEventsFCData($queryParams);
                 $this->processEventsData($queryParams);
-//                $this->processQuizData($queryParams);
+                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;

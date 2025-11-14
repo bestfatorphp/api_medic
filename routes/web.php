@@ -28,17 +28,20 @@ Route::get('/', function () {
 //        $q->where('old_mt_id', 1);
 //    })->with(['actions_mt_helios'])->limit(1)->get()->toArray();
 //    return \App\Models\ProjectTouchMT::find(10321);
-    return \App\Models\SendsayIssue::where('id', 769) //c 563, c 572 и далее - есть "is sent"
-        ->withCount([
-            'sendsay_participations as participation_delivered_count' => function($query) {
-                $query->where('result', 'delivered');
-            },
-            'sendsay_participations as participation_not_delivered_count' => function($query) {
-                $query->where('result', 'not delivered');
-            },
-            'sendsay_participations as participation_is_sent_count' => function($query) {
-                $query->where('result', 'is sent');
-            }
-        ])
-        ->first()->makeHidden(['open_rate', 'ctr', 'delivery_rate', 'opened', 'open_per_unique', 'clicked', 'clicks_per_unique', 'ctor']);
+//    return \App\Models\SendsayIssue::where('id', 769) //c 563, c 572 и далее - есть "is sent"
+//        ->withCount([
+//            'sendsay_participations as participation_delivered_count' => function($query) {
+//                $query->where('result', 'delivered');
+//            },
+//            'sendsay_participations as participation_not_delivered_count' => function($query) {
+//                $query->where('result', 'not delivered');
+//            },
+//            'sendsay_participations as participation_is_sent_count' => function($query) {
+//                $query->where('result', 'is sent');
+//            }
+//        ])
+//        ->first()->makeHidden(['open_rate', 'ctr', 'delivery_rate', 'opened', 'open_per_unique', 'clicked', 'clicks_per_unique', 'ctor']);
+    return ActivityMT::query()->where('event_id', '=', 282)->whereHas('actions_mt', function ($q) {
+        $q->whereIn('format', ['offline', 'online']);
+    })->with(['actions_mt'])->first()->toArray();
 });
