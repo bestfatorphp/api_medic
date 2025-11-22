@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string                 $category               Категория участий
  * @property string                 $source                 Источник
  * @property Carbon                 $last_login             Последняя авторизация на портале
+ * @property string                 $pdd_specialty          PDD специальности
  *
  * @property UserMT                 $user_mt
  * @property Doctor                 $doctor
