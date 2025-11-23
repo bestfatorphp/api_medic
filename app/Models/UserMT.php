@@ -36,6 +36,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string                 $uf_utm_campaign        utm метка
  * @property string                 $uf_utm_content         utm метка
  * @property Carbon                 $last_login             Последняя авторизация на портале
+ * @property string                 $medtouch_uuid
+ * @property string                 $oralink_uuid
  *
  * @property CommonDatabase         $common_database        Общая база
  * @property ActionMT               $actions_mt             Действия МТ

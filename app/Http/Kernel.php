@@ -64,5 +64,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'private.disk' => \App\Http\Middleware\CheckPrivateDiskAccessToken::class,
+        'auth.new.mt' => \App\Http\Middleware\NewMtAccessToken::class,
     ];
 }

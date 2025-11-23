@@ -191,7 +191,22 @@ class ImportByApiV1 extends Common
                 UserMT::upsertWithMutators(
                     $usersMTBatch,
                     ['email'],
-                    ['new_mt_id', 'old_mt_id', 'full_name', 'email', /*'registration_date', */'gender', 'birth_date', 'specialty', 'phone', 'place_of_employment', 'city', 'last_login']
+                    [
+//                        'new_mt_id',
+//                        'old_mt_id',
+//                        'full_name',
+//                        'email',
+//                        'registration_date',
+                        'gender',
+                        'birth_date',
+                        'specialty',
+                        'phone',
+                        'place_of_employment',
+                        'city',
+                        'last_login',
+                        'medtouch_uuid',
+                        'oralink_uuid'
+                    ]
                 );
             }, true);
 
@@ -212,7 +227,22 @@ class ImportByApiV1 extends Common
                 CommonDatabase::upsertWithMutators(
                     $commonDBBatch,
                     ['email'],
-                    ['full_name', 'mt_user_id', 'new_mt_id', 'old_mt_id', /*'registration_date', */'verification_status', 'email_status', 'username', 'gender', 'birth_date', 'specialty', 'phone', 'city', 'last_login']
+                    [
+//                        'full_name',
+//                        'mt_user_id',
+//                        'new_mt_id',
+//                        'old_mt_id',
+//                        'registration_date',
+//                        'verification_status',
+                        'email_status',
+                        'username',
+                        'gender',
+                        'birth_date',
+                        'specialty',
+                        'phone',
+                        'city',
+                        'last_login'
+                    ]
                 );
             }, true);
         });
@@ -239,6 +269,8 @@ class ImportByApiV1 extends Common
             'place_of_employment' => $userData['workplace'] ?? null,
             'city' => $userData['city'] ?? null,
             'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
+            'medtouch_uuid' => $userData['medtouch_uuid'] ?? null,
+            'oralink_uuid' => $userData['oralink_uuid'] ?? null,
         ];
     }
 
@@ -257,7 +289,7 @@ class ImportByApiV1 extends Common
             'email' => $userData['email'],
             'mt_user_id' => null,
             'registration_date' => $userData['created_at'],
-            'verification_status' => $userData['email_verified_at'] ? 'verified' : 'not_verified',
+//            'verification_status' => $userData['email_verified_at'] ? 'verified' : 'not_verified',
             'email_status' => $userData['activated'] ? 'active' : 'inactive',
             'username' => $userData['name'] ?? null,
             'gender' => $userData['gender'] ?? null,
