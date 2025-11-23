@@ -117,20 +117,10 @@ class UserMtDifferencesService
         foreach ($searchFields as $field => $searchValue) {
             $userValue = $user->{$field};
 
-            if ($field === 'full_name') {
-                //для имени проверяем частичное совпадение
-                if (stripos($userValue, $searchValue) !== false) {
-                    $matched[] = $field;
-                } else {
-                    $nonMatched[] = $field;
-                }
+            if ($userValue == $searchValue) {
+                $matched[] = $field;
             } else {
-                //для остальных полей - точное совпадение
-                if ($userValue == $searchValue) {
-                    $matched[] = $field;
-                } else {
-                    $nonMatched[] = $field;
-                }
+                $nonMatched[] = $field;
             }
         }
 
