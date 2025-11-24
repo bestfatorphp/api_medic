@@ -70,9 +70,9 @@ class Kernel extends ConsoleKernel
         ->dailyAt('02:30')
             ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
 
-//        $schedule->command('calculate:pdd_specialty_common_db --only=verification_status')
-//            ->dailyAt('04:00')
-//            ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
+        $schedule->command('calculate:pdd_specialty_common_db --only=verification_status')
+            ->dailyAt('04:00')
+            ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
         //Команды для битрикса больше не нужны, по ним всё собрано
 //       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')

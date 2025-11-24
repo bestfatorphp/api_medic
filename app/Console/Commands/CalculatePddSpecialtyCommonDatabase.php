@@ -270,13 +270,13 @@ class CalculatePddSpecialtyCommonDatabase extends Command
      */
     private function upsertBatchCommonDb(array &$commonDBBatch)
     {
-        $this->withTableLock('common_database', function () use ($commonDBBatch) {
-            CommonDatabase::upsertWithMutators(
+//        $this->withTableLock('common_database', function () use ($commonDBBatch) {
+            CommonDatabase::upsert(
                 $commonDBBatch,
                 ['email'],
                 ['verification_status']
             );
-        }, true);
+//        }, true);
 
         $commonDBBatch = [];
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
