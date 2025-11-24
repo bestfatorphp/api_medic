@@ -70,7 +70,7 @@ class Kernel extends ConsoleKernel
             ->dailyAt('02:30')
             ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
 
-       $schedule->command('calculate:pdd_specialty_common_db --only=verification_status')
+       $schedule->command('calculate:pdd_specialty_common_db --only=verification_status --createTempTableAndFill')
             ->dailyAt('03:30')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
