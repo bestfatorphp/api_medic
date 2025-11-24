@@ -99,6 +99,7 @@ trait WriteLockTrait
             });
         } catch (\Exception $e) {
             if ($withoutThrow) {
+                Log::error("Error: " . $e->getMessage());
                 return $e; //возвращаем объект исключения вместо его передачи
             }
             throw $e;

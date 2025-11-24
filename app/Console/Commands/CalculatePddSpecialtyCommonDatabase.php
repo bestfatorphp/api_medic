@@ -164,6 +164,8 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $commonDBBatch = [];
         $processed = 0;
         $notFound = 0;
+        $duplicates = 0;
+        $EMAILS = [];
 
         $statusStats = [
             '01_Верифицированный' => 0,
@@ -208,19 +210,23 @@ class CalculatePddSpecialtyCommonDatabase extends Command
                     continue;
                 }
 
-                $verificationStatus = $this->calculateVerificationStatus($item, $city, $pddSpecialty);
+                if (!in_array($email = $item->email, $EMAILS)) {
+                    $EMAILS[] = $email;
+                    $verificationStatus = $this->calculateVerificationStatus($item, $city, $pddSpecialty);
 
-                $statusStats[$verificationStatus]++;
+                    $statusStats[$verificationStatus]++;
 
-                $commonDBBatch[] = [
-                    'email' => $item->email,
-                    'verification_status' => $verificationStatus,
-                ];
-
-                $processed++;
+                    $commonDBBatch[] = [
+                        'email' => $item->email,
+                        'verification_status' => $verificationStatus,
+                    ];
+                    $processed++;
+                } else {
+                    $duplicates++;
+                }
 
                 if (count($commonDBBatch) >= $batchSize) {
-                    $this->upsertBatchCommonDb($commonDBBatch);
+                    $this->upsertBatchCommonDb($commonDBBatch, $EMAILS);
                 }
 
                 if ($processed % 500 === 0) {
@@ -234,10 +240,10 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $reader->close();
 
         if (!empty($commonDBBatch)) {
-            $this->upsertBatchCommonDb($commonDBBatch);
+            $this->upsertBatchCommonDb($commonDBBatch, $EMAILS);
         }
 
-        $this->outputFinalStats($statusStats, $processed, $notFound);
+        $this->outputFinalStats($statusStats, $processed, $notFound, $duplicates);
     }
 
     /**
@@ -268,28 +274,30 @@ class CalculatePddSpecialtyCommonDatabase extends Command
      * Пакетная вставка статусов верификаций
      * @throws \Exception
      */
-    private function upsertBatchCommonDb(array &$commonDBBatch)
+    private function upsertBatchCommonDb(array &$commonDBBatch, &$EMAILS)
     {
-//        $this->withTableLock('common_database', function () use ($commonDBBatch) {
+        $this->withTableLock('common_database', function () use ($commonDBBatch) {
             CommonDatabase::upsert(
                 $commonDBBatch,
                 ['email'],
                 ['verification_status']
             );
-//        }, true);
+        }, true);
 
         $commonDBBatch = [];
+        $EMAILS = [];
         gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 
-    private function outputFinalStats(array $statusStats, int $processed, int $notFound): void
+    private function outputFinalStats(array $statusStats, int $processed, int $notFound, int $duplicates): void
     {
-        $totalInFile = $processed + $notFound;
+        $totalInFile = $processed + $notFound + $duplicates;
 
         $this->info("");
         $this->info("ФНИАЛЬНАЯ СТАТИСТИКА:");
         $this->info("Всего записей в файле: {$totalInFile}");
         $this->info("Обработано успешно: {$processed}");
+        $this->info("Дубликатов: {$duplicates}");
         $this->info("Не найдено: {$notFound}");
         $this->info("");
         $this->info("Статусы верификации:");
