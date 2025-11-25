@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Services\UserMtDifferencesService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class UserMtController extends Controller
 {
@@ -18,34 +18,49 @@ class UserMtController extends Controller
         $this->searchService = $searchService;
     }
 
-    public function search(Request $request): JsonResponse
+    /**
+     * Отдаём список юзеров по полям medtouch_uuid и oralink_uuid
+     * @throws \Exception
+     */
+    public function listByUuid(string $field, Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'uuids' => 'required|array',
+            'uuids.*' => 'required|uuid',
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        return $this->responseItems($this->searchService->listByUuid($field, $request->all()));
+    }
+
+    /**
+     * @throws \Exception
+     */
+    public function oneByUuid(string $field, string $uuid): JsonResponse
+    {
+        return $this->responseItem($this->searchService->oneByUuid($field, $uuid));
+    }
+
+    /**
+     * @throws \Exception
+     */
+    public function differences(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:255',
             'email' => 'nullable|email',
             'phone' => 'nullable|string|max:20',
-            'medtouch_uuid' => 'nullable|string|max:255',
-            'oralink_uuid' => 'nullable||string|max:255',
+            'medtouch_uuid' => 'nullable|uuid',
+            'oralink_uuid' => 'nullable||uuid',
         ]);
 
         if ($validator->fails()) {
-            Log::error('VALIDATION FAILED', $validator->errors()->toArray());
-            return response()->json([
-                'error' => 'Validation failed',
-                'messages' => $validator->errors()
-            ], 422);
+            throw new ValidationException($validator);
         }
 
-        try {
-            $result = $this->searchService->searchUsers($request->all());
-
-            return response()->json($result);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Произошла ошибка при поиске',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        return $this->responseItem($this->searchService->differences($request->all()));
     }
 }

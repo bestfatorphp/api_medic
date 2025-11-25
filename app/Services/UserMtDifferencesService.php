@@ -5,15 +5,55 @@ namespace App\Services;
 use App\Models\UserMT;
 use Illuminate\Support\Arr;
 use JetBrains\PhpStorm\ArrayShape;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class UserMtDifferencesService
 {
+    /**
+     * Разрешённые поля для listByUuid и oneByUuid
+     * @var array|string[]
+     */
+    private array $allowedFields = ['medtouch_uuid', 'oralink_uuid'];
+
+    /**
+     * Отдаём список юзеров по полю medtouch_uuid или oralink_uuid
+     * @param string $field
+     * @param array $data
+     * @return array
+     * @throws \Exception
+     */
+    public function listByUuid(string $field, array $data): array
+    {
+        if (!in_array($field, $this->allowedFields)) {
+            throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
+        }
+
+        return UserMT::query()->whereIn($field, $data['uuids'])->get()->toArray();
+    }
+
+    /**
+     * Отдаём одного юзера по полю medtouch_uuid или oralink_uuid
+     * @param string $field
+     * @param string $uuid
+     * @return array
+     * @throws \Exception
+     */
+    public function oneByUuid(string $field, string $uuid): array
+    {
+        if (!in_array($field, $this->allowedFields)) {
+            throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
+        }
+
+        return UserMT::query()->where($field, $uuid)->first()->toArray();
+    }
+
+
     /**
      * Ищём пользователя и различия его данных с данными запроса
      * @param array $data
      * @return array
      */
-    public function searchUsers(array $data): array
+    public function differences(array $data): array
     {
         $phone = Arr::get($data, 'phone');
         $email = Arr::get($data, 'email');
@@ -32,11 +72,7 @@ class UserMtDifferencesService
         }
 
         if (!$user) {
-            return [
-                'match_type' => 'none',
-                'message' => 'Пользователь не найден',
-                'request' => $searchFields
-            ];
+            throw new NotFoundHttpException('Пользователь не найден');
         }
 
         //анализируем совпадения

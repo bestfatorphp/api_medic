@@ -28,7 +28,9 @@ Route::post('/webhook/id-errors', [WebhooksController::class, 'intellectDialogEr
 
 Route::middleware('auth.new.mt')->group(function () {
     Route::prefix('user-mt')->group(function () {
-        Route::post('/differences', [UserMtController::class, 'search']);
+        Route::post('differences', [UserMtController::class, 'differences']);
+        Route::post('list/{field}', [UserMtController::class, 'listByUuid']);
+        Route::post('one/{field}/{uuid}', [UserMtController::class, 'oneByUuid']);
     });
 
 });
