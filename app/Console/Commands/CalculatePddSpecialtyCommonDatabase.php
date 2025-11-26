@@ -22,8 +22,7 @@ class CalculatePddSpecialtyCommonDatabase extends Command
     protected $signature = 'calculate:pdd_specialty_common_db
                             {--only=all : Что заполняем. Варианты: all, pdd_specialties, verification_status и not_verified_verification_status.}
                             {--createTempTableAndFill : Создать временную талицу и заполнить из файла для расстановки verification_status.}
-                            {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}
-                            {--continueFurther : Продолжить выполнение, без обновления данных, во временной таблицы.}';
+                            {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}';
 
 
     protected $description = 'Расставновка PDD спецмальностей (разовая команда) из файла в common_database, в ограниченной памяти';
@@ -64,12 +63,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
      */
     private mixed $fillTempTable;
 
-    /**
-     * Продолжить выполнение, без обновления данных, во временной таблицы
-     * @var mixed
-     */
-    private mixed $continueFurther;
-
 
     public function handle(): int
     {
@@ -80,7 +73,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $only = $this->option('only');
         $this->createTempTableAndFill = $this->option('createTempTableAndFill');
         $this->fillTempTable = $this->option('fillTempTable');
-        $this->continueFurther = $this->option('continueFurther');
 
         if (!in_array($only, ['all', 'pdd_specialties', 'verification_status', 'not_verified_verification_status'])) {
             $this->error('Передано неверное знаыение only. Может принимать значения: all, pdd_specialties, verification_status');

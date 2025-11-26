@@ -76,7 +76,6 @@ class Kernel extends ConsoleKernel
 
         //todo: при первом запуске - "--createTempTableAndFill" (убрать при следующем запуске команды!!!)
         //todo: если обновили файл - "--fillTempTable", после заполнения таблицы, убрать при следующем запуске команды!!!
-        //todo: если нужно просто продолжить дальше - "--continueFurther", без --createTempTableAndFill и --fillTempTable!!!
        $schedule->command('calculate:pdd_specialty_common_db --only=verification_status --createTempTableAndFill')
             ->saturdays()
             ->at('04:00')
