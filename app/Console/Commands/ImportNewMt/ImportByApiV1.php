@@ -270,7 +270,7 @@ class ImportByApiV1 extends Common
             'city' => $userData['city'] ?? null,
             'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
             'medtouch_uuid' => !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null,
-            'oralink_uuid' => !empty($userData['medtouch_uuid']) ? $userData['oralink_uuid'] : null,
+            'oralink_uuid' => !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null,
         ];
     }
 
