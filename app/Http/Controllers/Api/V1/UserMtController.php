@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\UserMtDifferencesService;
+use App\Services\UserMtService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,15 +11,15 @@ use Illuminate\Validation\ValidationException;
 
 class UserMtController extends Controller
 {
-    private UserMtDifferencesService $searchService;
+    private UserMtService $searchService;
 
-    public function __construct(UserMtDifferencesService $searchService)
+    public function __construct(UserMtService $searchService)
     {
         $this->searchService = $searchService;
     }
 
     /**
-     * Отдаём список юзеров по полям medtouch_uuid и oralink_uuid
+     * Отдаём список юзеров по полю medtouch_uuid или oralink_uuid
      * @throws \Exception
      */
     public function listByUuid(string $field, Request $request): JsonResponse
@@ -37,6 +37,7 @@ class UserMtController extends Controller
     }
 
     /**
+     * Отдаём одного юзера по полю medtouch_uuid или oralink_uuid
      * @throws \Exception
      */
     public function oneByUuid(string $field, string $uuid): JsonResponse
@@ -45,6 +46,7 @@ class UserMtController extends Controller
     }
 
     /**
+     * Ищём пользователя и различия его данных с данными запроса
      * @throws \Exception
      */
     public function differences(Request $request): JsonResponse

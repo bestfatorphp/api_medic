@@ -44,6 +44,10 @@ class Kernel extends ConsoleKernel
 
         $commonPath = 'logs/';
 
+        $schedule->command('import:new-mt-users --onlyUsers=1')
+            ->dailyAt('09:05')
+            ->sendOutputTo(storage_path("{$commonPath}import-new-mt-users.log"));
+
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
 
        $schedule->command('import:id-campaigns')
@@ -72,7 +76,8 @@ class Kernel extends ConsoleKernel
 
         //todo: при первом запуске - "--createTempTableAndFill" (убрать при следующем запуске команды!!!)
         //todo: если обновили файл - "--fillTempTable", после заполнения таблицы, убрать при следующем запуске команды!!!
-       $schedule->command('calculate:pdd_specialty_common_db --only=verification_status')
+        //todo: если нужно просто продолжить дальше - "--continueFurther", без --createTempTableAndFill и --fillTempTable!!!
+       $schedule->command('calculate:pdd_specialty_common_db --only=verification_status --createTempTableAndFill')
             ->saturdays()
             ->at('04:00')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));

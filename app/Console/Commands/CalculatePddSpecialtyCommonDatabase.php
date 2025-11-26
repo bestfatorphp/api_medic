@@ -22,7 +22,9 @@ class CalculatePddSpecialtyCommonDatabase extends Command
     protected $signature = 'calculate:pdd_specialty_common_db
                             {--only=all : Что заполняем. Варианты: all, pdd_specialties, verification_status и not_verified_verification_status.}
                             {--createTempTableAndFill : Создать временную талицу и заполнить из файла для расстановки verification_status.}
-                            {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}';
+                            {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}
+                            {--continueFurther : Продолжить выполнение, без обновления данных, во временной таблицы.}';
+
 
     protected $description = 'Расставновка PDD спецмальностей (разовая команда) из файла в common_database, в ограниченной памяти';
 
@@ -62,6 +64,12 @@ class CalculatePddSpecialtyCommonDatabase extends Command
      */
     private mixed $fillTempTable;
 
+    /**
+     * Продолжить выполнение, без обновления данных, во временной таблицы
+     * @var mixed
+     */
+    private mixed $continueFurther;
+
 
     public function handle(): int
     {
@@ -72,6 +80,7 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $only = $this->option('only');
         $this->createTempTableAndFill = $this->option('createTempTableAndFill');
         $this->fillTempTable = $this->option('fillTempTable');
+        $this->continueFurther = $this->option('continueFurther');
 
         if (!in_array($only, ['all', 'pdd_specialties', 'verification_status', 'not_verified_verification_status'])) {
             $this->error('Передано неверное знаыение only. Может принимать значения: all, pdd_specialties, verification_status');
@@ -205,11 +214,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         //todo: если обновили файл - fillTempTable, после заполнения таблицы, убрать при следующем запуске команды!!!
         if ($this->createTempTableAndFill) {
             $this->createTempTable();
-        } else {
-            //обновляем все до начального состояния
-            DB::table($this->tempTableName)
-                ->where('processed', '=', true)
-                ->update(['processed' => false]);
         }
 
         //заполняем временную таблицу данными из файла
@@ -224,7 +228,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         while (true) {
             //получаем фио из первой, не обработанной, записи временной таблицы
             $firstRecord = DB::table($this->tempTableName)
-                ->where("processed", '=', false)
                 ->select('fio')
                 ->orderBy('id')
                 ->first();
@@ -238,7 +241,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
             //находим все, не обработанные, записи, из временной таблицы, по фио первой записи
             $tempRecords = DB::table($this->tempTableName)
                 ->where('fio', $fio)
-                ->where("processed", '=', false)
                 ->get()
                 ->toArray();
 
@@ -250,9 +252,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
 
             if ($commonDbUsers->isEmpty()) {
                 $notFound += count($tempRecords);
-                DB::table($this->tempTableName)
-                    ->where('fio', $fio)
-                    ->update(['processed' => true]);
             } else {
                 if ($commonDbUsers->count() > 1) {
                     //если пользователей, в коллекции из common_database, несколько
@@ -264,9 +263,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
                     $user = $commonDbUsers->first();
                     $this->addToCommonDBBatch($user, $tempRecords,$commonDBBatch,$statusStats,$processed);
                 }
-
-                //после всех действий, удаляем все записи временной таблицы, находящиеся в коллекции
-                DB::table($this->tempTableName)->where('fio', $fio)->delete();
             }
 
             if (count($commonDBBatch) >= $batchSize) {
@@ -275,6 +271,9 @@ class CalculatePddSpecialtyCommonDatabase extends Command
                 $this->info("Найдено и обновлено: {$processed}, Память: {$memory}MB");
                 $this->warn("Не найдено: {$notFound}");
             }
+
+            //после всех действий, удаляем все записи временной таблицы, находящиеся в коллекции
+            DB::table($this->tempTableName)->where('fio', $fio)->delete();
         }
 
         if (!empty($commonDBBatch)) {
@@ -322,8 +321,7 @@ class CalculatePddSpecialtyCommonDatabase extends Command
                 id SERIAL PRIMARY KEY,
                 fio VARCHAR(255) NOT NULL,
                 city VARCHAR(255),
-                pdd_specialty VARCHAR(255),
-                processed BOOLEAN DEFAULT FALSE
+                pdd_specialty VARCHAR(255)
             )
         ");
 

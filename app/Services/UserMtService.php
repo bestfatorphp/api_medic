@@ -7,7 +7,7 @@ use Illuminate\Support\Arr;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-class UserMtDifferencesService
+class UserMtService
 {
     /**
      * Разрешённые поля для listByUuid и oneByUuid
