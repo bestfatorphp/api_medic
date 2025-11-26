@@ -28,7 +28,7 @@ class UserMtService
             throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
         }
 
-        return UserMT::query()->whereIn($field, $data['uuids'])->get()->toArray();
+        return UserMT::query()->whereIn($field, $data['uuids'])->get()->makeHidden(['common_database'])->toArray();
     }
 
     /**
@@ -44,7 +44,7 @@ class UserMtService
             throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
         }
 
-        return UserMT::query()->where($field, $uuid)->first()->toArray();
+        return UserMT::query()->where($field, $uuid)->first()->makeHidden(['common_database'])->toArray();
     }
 
 

@@ -68,6 +68,11 @@ class UserMT extends Model
 //        });
 //    }
 
+
+    protected $appends = [
+        'verification_status',
+        'category'
+    ];
     /**
      * Действия МТ
      * @return HasMany
@@ -266,5 +271,23 @@ class UserMT extends Model
         if ($this->shouldUpdateFieldIfNull($value, $this->attributes['uf_utm_content'] ?? null)) {
             $this->attributes['uf_utm_content'] = $value;
         }
+    }
+
+    /**
+     * Гетер verification_status
+     */
+    public function getVerificationStatusAttribute(): ?string
+    {
+        return $this->common_database->verification_status;
+    }
+
+    /**
+     * Гетер category
+     * @param $value
+     * @return string|null
+     */
+    public function getCategoryAttribute($value): ?string
+    {
+        return $this->common_database->category;
     }
 }
