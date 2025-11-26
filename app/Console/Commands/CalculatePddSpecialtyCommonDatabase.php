@@ -194,9 +194,9 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $processed = 0;
         $notFound = 0;
         $statusStats = [
-            '01_Верифицированный' => 0,
-            '02_Полуверифицированный' => 0,
-            '03_Неверифицированный' => 0
+            '01_verified' => 0,
+            '02_half_verified' => 0,
+            '03_not_verified' => 0
         ];
 
         $this->info("Начинаем обработку...");
@@ -420,12 +420,12 @@ class CalculatePddSpecialtyCommonDatabase extends Command
             $allStatuses[] = $this->calculateVerificationStatus($user, $tempRecord->city, $tempRecord->pdd_specialty);
         }
 
-        $bestStatus = '03_Неверифицированный';
+        $bestStatus = '03_not_verified';
 
-        if (in_array('01_Верифицированный', $allStatuses)) {
-            $bestStatus = '01_Верифицированный';
-        } elseif (in_array('02_Полуверифицированный', $allStatuses)) {
-            $bestStatus = '02_Полуверифицированный';
+        if (in_array('01_verified', $allStatuses)) {
+            $bestStatus = '01_verified';
+        } elseif (in_array('02_half_verified', $allStatuses)) {
+            $bestStatus = '02_half_verified';
         }
 
         return $bestStatus;
@@ -446,12 +446,12 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $filePddSpecialty = trim($filePddSpecialty);
 
         if ($itemCity === $fileCity && $itemPddSpecialty === $filePddSpecialty) {
-            return "01_Верифицированный";
+            return "01_verified";
         } elseif (($itemCity !== $fileCity && $itemPddSpecialty === $filePddSpecialty) ||
             ($itemCity === $fileCity && $itemPddSpecialty !== $filePddSpecialty)) {
-            return "02_Полуверифицированный";
+            return "02_half_verified";
         } else {
-            return "03_Неверифицированный";
+            return "03_not_verified";
         }
     }
 
@@ -506,25 +506,30 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $this->info("Не найдено: {$notFound}");
         $this->info("");
         $this->info("Статусы верификации:");
-        $this->info("- Верифицированные: {$statusStats['01_Верифицированный']}");
-        $this->info("- Полуверифицированные: {$statusStats['02_Полуверифицированный']}");
-        $this->info("- Неверифицированные: {$statusStats['03_Неверифицированный']}");
+        $this->info("- Верифицированные: {$statusStats['01_verified']}");
+        $this->info("- Полуверифицированные: {$statusStats['02_half_verified']}");
+        $this->info("- Неверифицированные: {$statusStats['03_not_verified']}");
     }
 
     /**
-     * Устанавиваем в verification_status для всех оставшихся - 03_Неверифицированный
+     * Устанавиваем в verification_status для всех оставшихся - 03_not_verified
      * @throws \Exception
      */
     private function setNotVerifiedVerificationsStatus(): void
     {
-        $this->warn("Обновляем оставшиеся verification_status как '03_Неверифицированный'");
+        $this->warn("Обновляем оставшиеся verification_status как '03_not_verified'");
         $this->withTableLock('common_database', function () {
             CommonDatabase::query()
                 ->where(function ($query) {
                     $query->whereNull('verification_status')
                         ->orWhereIn('verification_status', ['verified', 'not_verified']);
                 })
-                ->update(['verification_status' => '03_Неверифицированный']);
+                ->update(['verification_status' => '03_not_verified']);
         });
     }
 }
+/**
+ * 01_verified - обработан успешно
+02_half_verified - обработан частично
+03_not_verified - обработан неуспешно
+ */

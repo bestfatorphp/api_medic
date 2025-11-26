@@ -289,7 +289,6 @@ class ImportByApiV1 extends Common
             'email' => $userData['email'],
             'mt_user_id' => null,
             'registration_date' => $userData['created_at'],
-//            'verification_status' => $userData['email_verified_at'] ? 'verified' : 'not_verified',
             'email_status' => $userData['activated'] ? 'active' : 'inactive',
             'username' => $userData['name'] ?? null,
             'gender' => $userData['gender'] ?? null,
