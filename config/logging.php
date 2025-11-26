@@ -63,16 +63,16 @@ return [
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 14,
+            'level' => 'debug',
+            'days' => 14, //хранение логов за 14 дней
+            'tap' => [App\Logging\CustomLog::class],
         ],
 
         'commands' => [
             'driver' => 'daily',
             'path' => storage_path('logs/commands/command.log'),
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => 30, //хранение логов за 30 дней
-            'permission' => 0664, //права на файлы
+            'days' => 14, //хранение логов за 14 дней
             'tap' => [App\Logging\CustomLog::class],
         ],
 
