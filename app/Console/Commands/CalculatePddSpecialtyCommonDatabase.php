@@ -528,8 +528,3 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         });
     }
 }
-/**
- * 01_verified - обработан успешно
-02_half_verified - обработан частично
-03_not_verified - обработан неуспешно
- */
