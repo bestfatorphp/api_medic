@@ -6,7 +6,6 @@ use App\Logging\CustomLog;
 use App\Models\CommonDatabase;
 use App\Models\UserMT;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Symfony\Component\Panther\Client;
 
