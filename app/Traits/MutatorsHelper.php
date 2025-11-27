@@ -189,7 +189,11 @@ trait MutatorsHelper
             return $currentValue;
         }
 
-        return mb_strtoupper($newValue, 'UTF-8');
+        $trimmedValue = trim($newValue ?? '');
+
+        return $trimmedValue !== ''
+            ? mb_strtoupper($trimmedValue, 'UTF-8')
+            : null;
     }
 
     /**
