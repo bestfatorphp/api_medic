@@ -12,7 +12,6 @@ use JetBrains\PhpStorm\Pure;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use Box\Spout\Reader\Common\Creator\ReaderEntityFactory;
 
 class CalculatePddSpecialtyCommonDatabase extends Command
@@ -20,18 +19,11 @@ class CalculatePddSpecialtyCommonDatabase extends Command
     use WriteLockTrait;
 
     protected $signature = 'calculate:pdd_specialty_common_db
-                            {--only=all : Что заполняем. Варианты: all, pdd_specialties, verification_status и not_verified_verification_status.}
                             {--createTempTableAndFill : Создать временную талицу и заполнить из файла для расстановки verification_status.}
                             {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}';
 
 
     protected $description = 'Расставновка PDD спецмальностей (разовая команда) из файла в common_database, в ограниченной памяти';
-
-    /**
-     * Путь к файлу PDD специльностей
-     * @var string
-     */
-    private string $filePathPddSpecialties = 'additional/directory_of_specialties_for_pdd.xlsx';
 
     /**
      * Путь к файлу по которому вычисляем статус верификации
@@ -70,29 +62,13 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         set_time_limit(0);
         DB::disableQueryLog();
 
-        $only = $this->option('only');
         $this->createTempTableAndFill = $this->option('createTempTableAndFill');
         $this->fillTempTable = $this->option('fillTempTable');
-
-        if (!in_array($only, ['all', 'pdd_specialties', 'verification_status', 'not_verified_verification_status'])) {
-            $this->error('Передано неверное знаыение only. Может принимать значения: all, pdd_specialties, verification_status');
-            return CommandAlias::FAILURE;
-        }
 
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало расстановки');
 
-            if (in_array($only, ['all', 'pdd_specialties'])) {
-                $this->setPddSpecialties();
-            }
-
-            if (in_array($only, ['all', 'verification_status'])) {
-                $this->setVerificationStatus();
-            }
-
-            if (in_array($only, ['all', 'not_verified_verification_status'])) {
-                $this->setNotVerifiedVerificationsStatus();
-            }
+            $this->setVerificationStatus();
 
             $this->info("\n[" . Carbon::now()->format('Y-m-d H:i:s') . "] Расстановка завершена");
             return CommandAlias::SUCCESS;
@@ -101,74 +77,6 @@ class CalculatePddSpecialtyCommonDatabase extends Command
             $this->error('Ошибка выполнения, смотрите логи: ' . $e->getMessage());
             return CommandAlias::FAILURE;
         }
-    }
-
-    /**
-     * Заполняем pdd_specialty
-     * @throws \Exception
-     */
-    private function setPddSpecialties(): void
-    {
-        $this->info("Расставляем pdd_specialty равное ДРУГОЕ");
-        $this->withTableLock('common_database', function () {
-            CommonDatabase::query()
-                ->whereNull('pdd_specialty')
-                ->where(function ($query) {
-                    $query->whereNull('specialty')
-                        ->orWhere('specialty', '=', 'ДРУГОЕ');
-                })
-                ->update(['pdd_specialty' => 'ДРУГОЕ']);
-        });
-
-        $this->info("Получаю ассоциативный массив специальностей...");
-        $specialties = $this->importSpecialtiesToAssocArray();
-
-        foreach ($specialties as $specialty => $pdd_specialty) {
-            $this->info("Обновляю PDD специальность для специальности {$specialty}, выставляю значение - {$pdd_specialty}");
-            $this->withTableLock('common_database', function () use ($specialty, $pdd_specialty) {
-                CommonDatabase::query()
-                    ->whereNull('pdd_specialty')
-                    ->where('specialty', '=', $specialty)
-                    ->update(['pdd_specialty' => $pdd_specialty]);
-            });
-        }
-
-        $specialties = [];
-        gc_mem_caches(); //очищаем кэши памяти Zend Engine
-    }
-
-    /**
-     * Формируем массив специальностей
-     * @return array
-     */
-    private function importSpecialtiesToAssocArray(): array
-    {
-        $spreadsheet = IOFactory::load(storage_path('app/' . $this->filePathPddSpecialties));
-        $worksheet = $spreadsheet->getActiveSheet();
-
-        $specialties = [];
-
-        foreach ($worksheet->getRowIterator(2) as $row) {
-            $cellIterator = $row->getCellIterator();
-            $cellIterator->setIterateOnlyExistingCells(false);
-
-            $cells = [];
-            foreach ($cellIterator as $cell) {
-                $cells[] = $cell->getValue();
-            }
-
-            //specialty — в столбце A (индекс 0), pdd_specialty — в столбце B (индекс 1)
-            if (isset($cells[0]) && isset($cells[1])) {
-                $specialty = trim($cells[0]);
-                $pddSpecialty = trim($cells[1]);
-
-                if (!empty($specialty) && !in_array($specialty, ["(пусто)", "ДРУГОЕ"])) {
-                    $specialties[$specialty] = $pddSpecialty;
-                }
-            }
-        }
-
-        return $specialties;
     }
 
     /**
@@ -230,7 +138,7 @@ class CalculatePddSpecialtyCommonDatabase extends Command
 
             $fio = $firstRecord->fio;
 
-            //находим все, не обработанные, записи, из временной таблицы, по фио первой записи
+            //находим все, записи, из временной таблицы, по фио первой записи
             $tempRecords = DB::table($this->tempTableName)
                 ->where('fio', $fio)
                 ->get()
@@ -509,22 +417,5 @@ class CalculatePddSpecialtyCommonDatabase extends Command
         $this->info("- Верифицированные: {$statusStats['01_verified']}");
         $this->info("- Полуверифицированные: {$statusStats['02_half_verified']}");
         $this->info("- Неверифицированные: {$statusStats['03_not_verified']}");
-    }
-
-    /**
-     * Устанавиваем в verification_status для всех оставшихся - 03_not_verified
-     * @throws \Exception
-     */
-    private function setNotVerifiedVerificationsStatus(): void
-    {
-        $this->warn("Обновляем оставшиеся verification_status как '03_not_verified'");
-        $this->withTableLock('common_database', function () {
-            CommonDatabase::query()
-                ->where(function ($query) {
-                    $query->whereNull('verification_status')
-                        ->orWhereIn('verification_status', ['verified', 'not_verified']);
-                })
-                ->update(['verification_status' => '03_not_verified']);
-        });
     }
 }

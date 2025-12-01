@@ -11,11 +11,12 @@ trait MutatorsHelper
      * UpdateOrCreate с обработкой мутаторов
      * @param array $uniqueBy
      * @param array|null $updateFields
+     * @param string|null $uniqueField
      * @return static|null
      */
-    public static function updateOrCreateWithMutators(array $uniqueBy, ?array $updateFields = null): ?static
+    public static function updateOrCreateWithMutators(array $uniqueBy, ?array $updateFields = null, string $uniqueField = null): ?static
     {
-        $processed = self::processDataWithMutators([$updateFields]);
+        $processed = self::processDataWithMutators([$updateFields], $uniqueField);
         try {
             return static::updateOrCreate($uniqueBy, $processed[0]);
         } catch (\Illuminate\Database\QueryException $e) {
@@ -56,10 +57,11 @@ trait MutatorsHelper
      * @param array $data
      * @param $uniqueBy
      * @param array|null $updateFields
+     * @param string|null $uniqueField
      * @return int
      */
-    public static function upsertWithMutators(array $data, $uniqueBy, ?array $updateFields = null): int {
-        $processed = self::processDataWithMutators($data);
+    public static function upsertWithMutators(array $data, $uniqueBy, ?array $updateFields = null, string $uniqueField = null): int {
+        $processed = self::processDataWithMutators($data, $uniqueField);
         $updateFields = $updateFields ?: array_keys(reset($data));
 
         return static::upsert($processed, $uniqueBy, $updateFields);
@@ -68,16 +70,26 @@ trait MutatorsHelper
     /**
      * Обрабатываем данные через мутаторы модели
      * @param array $data
+     * @param string|null $uniqueField
      * @return array
      */
-    protected static function processDataWithMutators(array $data): array
+    protected static function processDataWithMutators(array $data, string $uniqueField = null): array
     {
         return collect($data)
-            ->map(function ($item) {
-                $model = new static;
-                $fillable = $model->getFillable();
+            ->map(function ($item) use ($uniqueField) {
+                //всегда создаем новую модель для обработки мутаторов
+                $processingModel = new static;
 
-                //если fillable не определен, используем все ключи из item
+                //если нужно, заполняем существующими данными из базы
+                if ($uniqueField && isset($item[$uniqueField])) {
+                    $existingModel = static::query()->where($uniqueField, $item[$uniqueField])->first();
+                    if ($existingModel) {
+                        //заполняем новую модель атрибутами из базы
+                        $processingModel->fill($existingModel->getAttributes());
+                    }
+                }
+
+                $fillable = $processingModel->getFillable();
                 $fieldsToProcess = empty($fillable) ? array_keys($item) : $fillable;
 
                 $attributes = [];
@@ -87,25 +99,25 @@ trait MutatorsHelper
                         continue;
                     }
 
-                    //устанавливаем значение через мутатор
-                    $model->$field = $item[$field];
+                    //устанавливаем значение через сеттер (вызовет мутатор)
+                    $processingModel->$field = $item[$field];
 
-                    //получаем обработанное значение
-                    $attributes[$field] = $model->getAttributeValue($field);
+                    //получаем обработанное значение через геттер
+                    $attributes[$field] = $processingModel->$field;
                 }
 
-                //обработка дат из $dates
-                if (property_exists($model, 'dates')) {
-                    foreach ($model->getDates() as $dateField) {
+                //обработка дат
+                if (property_exists($processingModel, 'dates')) {
+                    foreach ($processingModel->getDates() as $dateField) {
                         if (isset($attributes[$dateField])) {
-                            $attributes[$dateField] = $model->asDateTime($attributes[$dateField]);
+                            $attributes[$dateField] = $processingModel->asDateTime($attributes[$dateField]);
                         }
                     }
                 }
 
                 return $attributes;
             })
-            ->filter() //удаляем полностью пустые записи
+            ->filter()
             ->values()
             ->toArray();
     }

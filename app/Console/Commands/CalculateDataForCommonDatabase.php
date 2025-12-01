@@ -9,6 +9,7 @@ use App\Models\ProjectTouchMT;
 use App\Traits\WriteLockTrait;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
 class CalculateDataForCommonDatabase extends Command
@@ -22,6 +23,12 @@ class CalculateDataForCommonDatabase extends Command
 
     private int $chunk;
 
+    /**
+     * Путь к файлу PDD специльностей
+     * @var string
+     */
+    private string $filePathPddSpecialties = 'additional/directory_of_specialties_for_pdd.xlsx';
+
     public function handle(): int
     {
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
@@ -34,6 +41,8 @@ class CalculateDataForCommonDatabase extends Command
             $this->info("Начинаем подсчёт. Чанк {$this->chunk}...");
 
             $this->calculateAllData();
+
+            $this->setPddSpecialties();
 
             $this->info('Подсчёт окончен!');
             return CommandAlias::SUCCESS;
@@ -313,5 +322,73 @@ class CalculateDataForCommonDatabase extends Command
         }
 
         return $conditions;
+    }
+
+    /**
+     * Заполняем pdd_specialty
+     * @throws \Exception
+     */
+    private function setPddSpecialties(): void
+    {
+        $this->info("Расставляем pdd_specialty равное ДРУГОЕ");
+        $this->withTableLock('common_database', function () {
+            CommonDatabase::query()
+                ->whereNull('pdd_specialty')
+                ->where(function ($query) {
+                    $query->whereNull('specialty')
+                        ->orWhere('specialty', '=', 'ДРУГОЕ');
+                })
+                ->update(['pdd_specialty' => 'ДРУГОЕ']);
+        });
+
+        $this->info("Получаю ассоциативный массив специальностей...");
+        $specialties = $this->importSpecialtiesToAssocArray();
+
+        foreach ($specialties as $specialty => $pdd_specialty) {
+            $this->info("Обновляю PDD специальность для специальности {$specialty}, выставляю значение - {$pdd_specialty}");
+            $this->withTableLock('common_database', function () use ($specialty, $pdd_specialty) {
+                CommonDatabase::query()
+                    ->whereNull('pdd_specialty')
+                    ->where('specialty', '=', $specialty)
+                    ->update(['pdd_specialty' => $pdd_specialty]);
+            });
+        }
+
+        $specialties = [];
+        gc_mem_caches(); //очищаем кэши памяти Zend Engine
+    }
+
+    /**
+     * Формируем массив специальностей
+     * @return array
+     */
+    private function importSpecialtiesToAssocArray(): array
+    {
+        $spreadsheet = IOFactory::load(storage_path('app/' . $this->filePathPddSpecialties));
+        $worksheet = $spreadsheet->getActiveSheet();
+
+        $specialties = [];
+
+        foreach ($worksheet->getRowIterator(2) as $row) {
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(false);
+
+            $cells = [];
+            foreach ($cellIterator as $cell) {
+                $cells[] = $cell->getValue();
+            }
+
+            //specialty — в столбце A (индекс 0), pdd_specialty — в столбце B (индекс 1)
+            if (isset($cells[0]) && isset($cells[1])) {
+                $specialty = trim($cells[0]);
+                $pddSpecialty = trim($cells[1]);
+
+                if (!empty($specialty) && !in_array($specialty, ["(пусто)", "ДРУГОЕ"])) {
+                    $specialties[$specialty] = $pddSpecialty;
+                }
+            }
+        }
+
+        return $specialties;
     }
 }
