@@ -102,6 +102,7 @@ class ImportByApiV1 extends Common
         $totalResponses = 0;
         $totalProcessed = 0;
         $countBatchInsert = 0;
+        $countNonValidEmail = 0;
 
         $usersMTBatch = [];
         $commonDBBatch = [];
@@ -122,6 +123,7 @@ class ImportByApiV1 extends Common
                     $email = $userData['email'];
 
                     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $countNonValidEmail++;
                         $this->info("Пропущен пользователь с невалидным email: {$email}");
                         continue;
                     }
@@ -171,6 +173,7 @@ class ImportByApiV1 extends Common
                 $this->insertUsersBatch($usersMTBatch, $commonDBBatch);
             }
 
+            $this->info("Пропущено с невалидным email $countNonValidEmail пользователей");
             $this->info("Извлечено $totalProcessed пользователей");
         } catch (\Exception $e) {
             $this->error("Ошибка получения данных: " . $e->getMessage());
@@ -194,7 +197,7 @@ class ImportByApiV1 extends Common
                     [
 //                        'new_mt_id',
 //                        'old_mt_id',
-//                        'full_name',
+                        'full_name',
 //                        'email',
 //                        'registration_date',
                         'gender',
@@ -205,8 +208,11 @@ class ImportByApiV1 extends Common
                         'city',
                         'last_login',
                         'medtouch_uuid',
-                        'oralink_uuid'
-                    ]
+                        'oralink_uuid',
+                        'medtouch_uuids',
+                        'oralink_uuids'
+                    ],
+                    'email'
                 );
             }, true);
 
@@ -228,7 +234,7 @@ class ImportByApiV1 extends Common
                     $commonDBBatch,
                     ['email'],
                     [
-//                        'full_name',
+                        'full_name',
 //                        'mt_user_id',
 //                        'new_mt_id',
 //                        'old_mt_id',
@@ -242,7 +248,8 @@ class ImportByApiV1 extends Common
                         'phone',
                         'city',
                         'last_login'
-                    ]
+                    ],
+                    'email'
                 );
             }, true);
         });
@@ -256,6 +263,8 @@ class ImportByApiV1 extends Common
      */
     protected function prepareMtUserData(array $userData, string $fullName): array
     {
+        $medtouch_uuid = !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null;
+        $oralink_uuid = !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null;
         return [
             'new_mt_id' => $userData['id'],
             'old_mt_id' => $userData['medtouch_id'],
@@ -269,8 +278,10 @@ class ImportByApiV1 extends Common
             'place_of_employment' => $userData['workplace'] ?? null,
             'city' => $userData['city'] ?? null,
             'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
-            'medtouch_uuid' => !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null,
-            'oralink_uuid' => !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null,
+            'medtouch_uuid' => $medtouch_uuid,
+            'oralink_uuid' => $oralink_uuid,
+            'medtouch_uuids' => $medtouch_uuid,
+            'oralink_uuids' => $oralink_uuid,
         ];
     }
 
