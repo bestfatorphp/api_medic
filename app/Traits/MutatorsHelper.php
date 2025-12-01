@@ -11,11 +11,12 @@ trait MutatorsHelper
      * UpdateOrCreate с обработкой мутаторов
      * @param array $uniqueBy
      * @param array|null $updateFields
+     * @param string|null $uniqueField
      * @return static|null
      */
-    public static function updateOrCreateWithMutators(array $uniqueBy, ?array $updateFields = null): ?static
+    public static function updateOrCreateWithMutators(array $uniqueBy, ?array $updateFields = null, string $uniqueField = null): ?static
     {
-        $processed = self::processDataWithMutators([$updateFields]);
+        $processed = self::processDataWithMutators([$updateFields], $uniqueField);
         try {
             return static::updateOrCreate($uniqueBy, $processed[0]);
         } catch (\Illuminate\Database\QueryException $e) {

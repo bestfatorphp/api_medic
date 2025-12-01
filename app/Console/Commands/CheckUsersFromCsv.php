@@ -44,7 +44,6 @@ class CheckUsersFromCsv extends Command
         $nonExistingUsers = 0;
         $invalidEmails = 0;
         $processed = 0;
-        $missingSearchField = 0;
 
         $this->info("Начинаем обработку CSV файла...");
 
@@ -100,7 +99,6 @@ class CheckUsersFromCsv extends Command
         $this->info("Всего обработано записей: {$processed}");
         $this->info("Существующие пользователи: {$existingUsers}");
         $this->info("Несуществующие пользователи: {$nonExistingUsers}");
-        $this->info("Отсутствует поле для поиска: {$missingSearchField}");
         $this->info("Невалидные email: {$invalidEmails}");
 
         return self::SUCCESS;

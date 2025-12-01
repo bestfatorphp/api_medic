@@ -131,17 +131,23 @@ class ImportByApiV1 extends Common
                     $email = strtolower($email);
                     $userData['email'] = $email;
 
-                    if (in_array($email, $EMAILS)) {
-                        continue;
-                    }
-
-                    $EMAILS[] = $email;
-
                     $fullName = trim(implode(' ', array_filter([
                         $userData['last_name'] ?? null,
                         $userData['first_name'] ?? null,
                         $userData['middle_name'] ?? null
                     ])));
+
+                    if (in_array($email, $EMAILS)) {
+                        //найти запись и обновить uuids
+                        UserMT::updateOrCreateWithMutators(
+                            ['email' => $email],
+                            $this->prepareMtUserData($userData, $fullName),
+                            'email'
+                        );
+                        continue;
+                    }
+
+                    $EMAILS[] = $email;
 
                     $usersMTBatch[] = $this->prepareMtUserData($userData, $fullName);
                     $commonDBBatch[] = $this->prepareCommonDBData($userData, $fullName);
@@ -265,6 +271,7 @@ class ImportByApiV1 extends Common
     {
         $medtouch_uuid = !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null;
         $oralink_uuid = !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null;
+
         return [
             'new_mt_id' => $userData['id'],
             'old_mt_id' => $userData['medtouch_id'],
