@@ -213,8 +213,6 @@ class ImportByApiV1 extends Common
                         'place_of_employment',
                         'city',
                         'last_login',
-                        'medtouch_uuid',
-                        'oralink_uuid',
                         'medtouch_uuids',
                         'oralink_uuids'
                     ],
@@ -269,9 +267,6 @@ class ImportByApiV1 extends Common
      */
     protected function prepareMtUserData(array $userData, string $fullName): array
     {
-        $medtouch_uuid = !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null;
-        $oralink_uuid = !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null;
-
         return [
             'new_mt_id' => $userData['id'],
             'old_mt_id' => $userData['medtouch_id'],
@@ -285,10 +280,8 @@ class ImportByApiV1 extends Common
             'place_of_employment' => $userData['workplace'] ?? null,
             'city' => $userData['city'] ?? null,
             'last_login' => $userData['last_login'] ? Carbon::parse($userData['last_login']) : null,
-            'medtouch_uuid' => $medtouch_uuid,
-            'oralink_uuid' => $oralink_uuid,
-            'medtouch_uuids' => $medtouch_uuid,
-            'oralink_uuids' => $oralink_uuid,
+            'medtouch_uuids' => !empty($userData['medtouch_uuid']) ? $userData['medtouch_uuid'] : null,
+            'oralink_uuids' => !empty($userData['oralink_uuid']) ? $userData['oralink_uuid'] : null
         ];
     }
 

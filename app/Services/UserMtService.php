@@ -16,7 +16,7 @@ class UserMtService
     private array $allowedFields = ['medtouch_uuid', 'oralink_uuid'];
 
     /**
-     * Отдаём список юзеров по полю medtouch_uuid или oralink_uuid
+     * Отдаём список юзеров по полю medtouch_uuids или oralink_uuids
      * @param string $field
      * @param array $data
      * @return array
@@ -28,11 +28,17 @@ class UserMtService
             throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
         }
 
-        return UserMT::query()->whereIn($field, $data['uuids'])->get()->makeHidden(['common_database'])->toArray();
+        $uuids = $data['uuids'] ?? [];
+
+        return UserMT::query()->where(function ($q) use ($field, $uuids) {
+            foreach ($uuids as $uuid) {
+                $q->orWhereJsonContains($field . 's', $uuid);
+            }
+        })->get()->makeHidden(['common_database'])->toArray();
     }
 
     /**
-     * Отдаём одного юзера по полю medtouch_uuid или oralink_uuid
+     * Отдаём одного юзера по полю medtouch_uuids или oralink_uuids
      * @param string $field
      * @param string $uuid
      * @return array
@@ -44,7 +50,13 @@ class UserMtService
             throw new \Exception("Недопустимое поле для поиска: {$field}", 500);
         }
 
-        return UserMT::query()->where($field, $uuid)->first()->makeHidden(['common_database'])->toArray();
+        $user = UserMT::query()->whereJsonContains($field . 's', $uuid)->first();
+
+        if (!$user) {
+            throw new NotFoundHttpException("Пользователь не найден");
+        }
+
+        return $user->makeHidden(['common_database'])->toArray();
     }
 
 
@@ -61,13 +73,13 @@ class UserMtService
             'full_name' => Arr::get($data, 'name'),
             'email' => $email ? strtolower($email) : $email,
             'phone' => $phone ? $this->normalizePhone($phone) : $phone,
-            'medtouch_uuid' => Arr::get($data, 'medtouch_uuid'),
-            'oralink_uuid' => Arr::get($data, 'oralink_uuid'),
+            'medtouch_uuids' => Arr::get($data, 'medtouch_uuid'),
+            'oralink_uuids' => Arr::get($data, 'oralink_uuid'),
         ];
 
         $user = null;
-        if (!is_null($searchFields['email']) || !is_null($searchFields['medtouch_uuid']) || !is_null($searchFields['oralink_uuid'])) {
-            //ищем пользователя по уникальным полям (email, medtouch_uuid, oralink_uuid)
+        if (!is_null($searchFields['email']) || !is_null($searchFields['medtouch_uuids']) || !is_null($searchFields['oralink_uuids'])) {
+            //ищем пользователя по уникальным полям (email, medtouch_uuids, oralink_uuids)
             $user = $this->findUserByUniqueFields($searchFields);
         }
 
@@ -98,8 +110,8 @@ class UserMtService
                 'full_name' => $user->full_name,
                 'email' => $user->email,
                 'phone' => $user->phone,
-                'medtouch_uuid' => $user->medtouch_uuid,
-                'oralink_uuid' => $user->oralink_uuid,
+                'medtouch_uuids' => $user->medtouch_uuids,
+                'oralink_uuids' => $user->oralink_uuids,
             ],
             'matched_fields' => $matchAnalysis['matched'],
             'non_matched_fields' => $matchAnalysis['non_matched']
@@ -119,12 +131,12 @@ class UserMtService
             $conditions[] = ['email', '=', $searchFields['email']];
         }
 
-        if (!empty($searchFields['medtouch_uuid'])) {
-            $conditions[] = ['medtouch_uuid', '=', $searchFields['medtouch_uuid']];
+        if (!empty($searchFields['medtouch_uuids'])) {
+            $conditions[] = ['medtouch_uuids', 'json_contains', $searchFields['medtouch_uuids']];
         }
 
-        if (!empty($searchFields['oralink_uuid'])) {
-            $conditions[] = ['oralink_uuid', '=', $searchFields['oralink_uuid']];
+        if (!empty($searchFields['oralink_uuids'])) {
+            $conditions[] = ['oralink_uuids', 'json_contains', $searchFields['oralink_uuids']];
         }
 
         if (empty($conditions)) {
@@ -133,7 +145,13 @@ class UserMtService
 
         return UserMT::where(function ($q) use ($conditions) {
             foreach ($conditions as $condition) {
-                $q->orWhere($condition[0], $condition[1], $condition[2]);
+                [$field, $operator, $value] = $condition;
+
+                if ($operator === 'json_contains') {
+                    $q->orWhereJsonContains($field, $value);
+                } else {
+                    $q->orWhere($field, $operator, $value);
+                }
             }
         })->first();
     }

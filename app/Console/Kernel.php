@@ -72,7 +72,7 @@ class Kernel extends ConsoleKernel
 
         //todo: при первом запуске - "--createTempTableAndFill" (убрать при следующем запуске команды!!!)
         //todo: если обновили файл - "--fillTempTable", после заполнения таблицы, убрать при следующем запуске команды!!!
-       $schedule->command('calculate:pdd_specialty_common_db --only=verification_status --createTempTableAndFill')
+       $schedule->command('calculate:pdd_specialty_common_db --createTempTableAndFill')
             ->fridays()
             ->at('04:00')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));

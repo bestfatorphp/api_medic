@@ -102,8 +102,8 @@ trait MutatorsHelper
                     //устанавливаем значение через сеттер (вызовет мутатор)
                     $processingModel->$field = $item[$field];
 
-                    //получаем обработанное значение через геттер
-                    $attributes[$field] = $processingModel->$field;
+                    //берем значение напрямую из атрибутов
+                    $attributes[$field] = $processingModel->getAttributes()[$field] ?? null;
                 }
 
                 //обработка дат

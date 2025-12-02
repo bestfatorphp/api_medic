@@ -37,8 +37,6 @@ use Illuminate\Support\Facades\Log;
  * @property string                 $uf_utm_campaign        utm метка
  * @property string                 $uf_utm_content         utm метка
  * @property Carbon                 $last_login             Последняя авторизация на портале
- * @property string                 $medtouch_uuid          todo: удалить, после преобразования ручек
- * @property string                 $oralink_uuid           todo: удалить, после преобразования ручек
  * @property array                  $medtouch_uuids         medtouch_uuids пользователя, в связи с дубликатами
  * @property array                  $oralink_uuids          oralink_uuids пользователя, в связи с дубликатами
  *
@@ -54,6 +52,11 @@ class UserMT extends Model
     public $timestamps = false;
 
     protected $guarded = ['id'];
+
+    protected $casts = [
+        'medtouch_uuids' => 'array',
+        'oralink_uuids' => 'array',
+    ];
 
     protected $attributes = [
         'medtouch_uuids' => '[]',
@@ -81,6 +84,7 @@ class UserMT extends Model
         'verification_status',
         'category'
     ];
+
     /**
      * Действия МТ
      * @return HasMany
@@ -116,17 +120,18 @@ class UserMT extends Model
     }
 
     /**
-     * @param string $attribute
+     * @param string $field
      * @param $value
      */
-    protected function addUuidToArray(string $attribute, $value): void
+    protected function addUuidToArray(string $field, $value): void
     {
         if (!$value) {
             return;
         }
 
-        $currentJson = $this->attributes[$attribute] ?? '[]';
-        $currentUuids = json_decode($currentJson, true) ?? [];
+        $currentJson = $this->getAttributeFromArray($field) ?? '[]';
+        $currentUuids = $this->jsonToArray($currentJson);
+
         $uuidsToAdd = $this->extractValidUuids($value);
 
         if (empty($uuidsToAdd)) {
@@ -136,8 +141,26 @@ class UserMT extends Model
         $newUuids = array_unique(array_merge($currentUuids, $uuidsToAdd));
 
         if (count($newUuids) !== count($currentUuids)) {
-            $this->attributes[$attribute] = json_encode(array_values($newUuids));
+            $this->attributes[$field] = json_encode(array_values($newUuids));
         }
+    }
+
+    /**
+     * @param $value
+     * @return array
+     */
+    protected function jsonToArray($value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && !empty($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     /**
@@ -152,25 +175,24 @@ class UserMT extends Model
             if (str_starts_with($value, '[')) {
                 $decoded = json_decode($value, true);
                 if (is_array($decoded)) {
-                    $uuids = $this->filterValidUuids($decoded);
+                    foreach ($decoded as $uuid) {
+                        if ($this->isValidUuid($uuid)) {
+                            $uuids[] = $uuid;
+                        }
+                    }
                 }
             } elseif ($this->isValidUuid($value)) {
                 $uuids[] = $value;
             }
         } elseif (is_array($value)) {
-            $uuids = $this->filterValidUuids($value);
+            foreach ($value as $uuid) {
+                if ($this->isValidUuid($uuid)) {
+                    $uuids[] = $uuid;
+                }
+            }
         }
 
         return $uuids;
-    }
-
-    /**
-     * @param array $uuids
-     * @return array
-     */
-    protected function filterValidUuids(array $uuids): array
-    {
-        return array_filter($uuids, fn($uuid) => $this->isValidUuid($uuid));
     }
 
     /**
