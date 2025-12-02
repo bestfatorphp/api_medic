@@ -333,7 +333,7 @@ class CalculateDataForCommonDatabase extends Command
         $this->info("Расставляем pdd_specialty равное ДРУГОЕ");
         $this->withTableLock('common_database', function () {
             CommonDatabase::query()
-                ->whereNull('pdd_specialty')
+//                ->whereNull('pdd_specialty')
                 ->where(function ($query) {
                     $query->whereNull('specialty')
                         ->orWhere('specialty', '=', 'ДРУГОЕ');
@@ -348,7 +348,7 @@ class CalculateDataForCommonDatabase extends Command
             $this->info("Обновляю PDD специальность для специальности {$specialty}, выставляю значение - {$pdd_specialty}");
             $this->withTableLock('common_database', function () use ($specialty, $pdd_specialty) {
                 CommonDatabase::query()
-                    ->whereNull('pdd_specialty')
+//                    ->whereNull('pdd_specialty')
                     ->where('specialty', '=', $specialty)
                     ->update(['pdd_specialty' => $pdd_specialty]);
             });
