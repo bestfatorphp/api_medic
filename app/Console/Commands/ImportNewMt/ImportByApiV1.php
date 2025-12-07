@@ -548,7 +548,7 @@ class ImportByApiV1 extends Common
      * @param int $activityId
      * @return array
      */
-    #[ArrayShape(['email' => "string", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float", 'registered_at' => "mixed"])]
+    #[ArrayShape(['email' => "string", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float"])]
     private function prepareActionFcData(array $fcData, int $activityId): array
     {
         //По мероприятиям, если я правильно понимаю, то тут для каждого мероприятия есть started_at+finished_at, значит мы можем посчитать сколько мероприятие шло
@@ -568,7 +568,6 @@ class ImportByApiV1 extends Common
             'date_time' => $fcData['created_at'],
             'duration' => $this->formatDuration($totalWatchSeconds),
             'result' => $this->calculateEventResult($totalWatchSeconds, $eventDuration),
-            'registered_at' => $fcData['created_at']
         ];
     }
 

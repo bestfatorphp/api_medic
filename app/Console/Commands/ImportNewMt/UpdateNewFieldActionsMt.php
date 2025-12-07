@@ -171,7 +171,6 @@ class UpdateNewFieldActionsMt extends Common
      * @param int $activityId
      * @return array
      */
-    #[ArrayShape(['email' => "string", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float", 'registered_at' => "mixed"])]
     private function prepareActionFcData(array $fcData, int $activityId): array
     {
         return [
@@ -179,7 +178,6 @@ class UpdateNewFieldActionsMt extends Common
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
             'date_time' => $fcData['created_at'],
-            'registered_at' => $fcData['created_at']
         ];
     }
 
@@ -197,10 +195,8 @@ class UpdateNewFieldActionsMt extends Common
                     ->where('email', $data['email'])
                     ->where('mt_user_id', $data['mt_user_id'])
                     ->where('activity_id', $data['activity_id'])
-                    ->where('date_time', $data['date_time'])
                     ->update([
-                        'date_time' => $data['registered_at'],
-                        'registered_at' => $data['registered_at']
+                        'date_time' => $data['date_time'],
                     ]);
             }
         });
