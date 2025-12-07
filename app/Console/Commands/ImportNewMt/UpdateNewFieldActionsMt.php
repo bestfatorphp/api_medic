@@ -56,7 +56,6 @@ class UpdateNewFieldActionsMt extends Common
             'order' => 'updated_at',
         ], $queryParams);
 
-
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало обновления');
             $this->processEventsFCData($queryParams);
@@ -195,6 +194,7 @@ class UpdateNewFieldActionsMt extends Common
                     ->where('email', $data['email'])
                     ->where('mt_user_id', $data['mt_user_id'])
                     ->where('activity_id', $data['activity_id'])
+                    ->whereNull('date_time')
                     ->update([
                         'date_time' => $data['date_time'],
                     ]);
