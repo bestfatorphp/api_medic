@@ -56,6 +56,7 @@ class UpdateNewFieldActionsMt extends Common
             'order' => 'updated_at',
         ], $queryParams);
 
+
         try {
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Начало обновления');
             $this->processEventsFCData($queryParams);
@@ -170,13 +171,15 @@ class UpdateNewFieldActionsMt extends Common
      * @param int $activityId
      * @return array
      */
+    #[ArrayShape(['email' => "string", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'registered_at' => "mixed"])]
     private function prepareActionFcData(array $fcData, int $activityId): array
     {
         return [
             'email' => strtolower($fcData['user']['email']),
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
-            'date_time' => $fcData['created_at'],
+            'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),
+            'registered_at' => $fcData['created_at']
         ];
     }
 
@@ -194,10 +197,11 @@ class UpdateNewFieldActionsMt extends Common
                     ->where('email', $data['email'])
                     ->where('mt_user_id', $data['mt_user_id'])
                     ->where('activity_id', $data['activity_id'])
-                    ->whereNull('date_time')
-                    ->update([
-                        'date_time' => $data['date_time'],
-                    ]);
+//                    ->where('date_time', $data['date_time']) //в поле изменено значение...
+                    ->update(
+                        [
+                            'registered_at' => $data['registered_at']
+                        ]);
             }
         });
     }
