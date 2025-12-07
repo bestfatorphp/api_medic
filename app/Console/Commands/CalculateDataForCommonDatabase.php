@@ -5,7 +5,9 @@ namespace App\Console\Commands;
 use App\Logging\CustomLog;
 use App\Models\ActionMT;
 use App\Models\CommonDatabase;
+use App\Models\Doctor;
 use App\Models\ProjectTouchMT;
+use App\Models\UserMT;
 use App\Traits\WriteLockTrait;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +31,12 @@ class CalculateDataForCommonDatabase extends Command
      */
     private string $filePathPddSpecialties = 'additional/directory_of_specialties_for_pdd.xlsx';
 
+    /**
+     * Путь до файла регион -> город
+     * @var string
+     */
+    private string $filePathDataRegionByCity = 'additional/city_region_list.xlsx';
+
     public function handle(): int
     {
         ini_set('memory_limit', env('COMMANDS_MEMORY_LIMIT', '128') . 'M');
@@ -43,6 +51,8 @@ class CalculateDataForCommonDatabase extends Command
             $this->calculateAllData();
 
             $this->setPddSpecialties();
+
+            $this->setRegionByCity();
 
             $this->info('Подсчёт окончен!');
             return CommandAlias::SUCCESS;
@@ -390,5 +400,66 @@ class CalculateDataForCommonDatabase extends Command
         }
 
         return $specialties;
+    }
+
+    /**
+     * Расставляем регионы по городам
+     * @throws \Exception
+     */
+    private function setRegionByCity()
+    {
+        $this->info("Расставляем регионы по городам");
+
+        $filePath = storage_path('app/' . $this->filePathDataRegionByCity);
+
+        if (!file_exists($filePath)) {
+            throw new \Exception("Файл не найден: {$filePath}");
+        }
+
+        $spreadsheet = IOFactory::load($filePath);
+        $worksheet = $spreadsheet->getActiveSheet();
+
+        foreach ($worksheet->getRowIterator(2) as $row) {
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(false);
+
+            $cells = [];
+            foreach ($cellIterator as $cell) {
+                $cells[] = $cell->getValue();
+            }
+
+            if (isset($cells[0]) && isset($cells[1])) {
+                $city = trim($cells[0]);
+                $region = trim($cells[1]);
+
+                if ($region === 'region') {
+                    continue;
+                }
+
+                $this->info("Расставляем регион {$region} по городу {$city}");
+
+                if (!empty($city) && !empty($region)) {
+                    $this->withTableLock('common_database', function () use ($city, $region) {
+                        CommonDatabase::query()
+                            ->where('city', '=', $city)
+                            ->update(['region' => $region]);
+                    });
+
+                    $this->withTableLock('users_mt', function () use ($city, $region) {
+                        UserMT::query()
+                            ->where('city', '=', $city)
+                            ->update(['region' => $region]);
+                    });
+
+                    $this->withTableLock('doctors', function () use ($city, $region) {
+                        Doctor::query()
+                            ->where('city', '=', $city)
+                            ->update(['region' => $region]);
+                    });
+                }
+            }
+        }
+
+        $this->info("Расставка регионо по городам закончена");
     }
 }
