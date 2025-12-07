@@ -45,7 +45,7 @@ class Kernel extends ConsoleKernel
         $commonPath = 'logs/';
 
         $schedule->command('update:actions-mt-field-by-fc --updated_after=01.01.2025')
-            ->dailyAt('15:30')
+            ->dailyAt('15:55')
             ->sendOutputTo(storage_path("{$commonPath}update-actions-mt-field-by-fc.log"));
 
         //Суточные комманды (сбор статистики и данных за предыдущие сутки)
