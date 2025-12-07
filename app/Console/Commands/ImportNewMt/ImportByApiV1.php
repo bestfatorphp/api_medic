@@ -77,8 +77,8 @@ class ImportByApiV1 extends Common
             $this->processUserData($queryParams);
             if (!(bool)$onlyUsers) {
                 $this->processEventsFCData($queryParams);
-                $this->processEventsData($queryParams);
-                $this->processQuizData($queryParams);
+//                $this->processEventsData($queryParams);
+//                $this->processQuizData($queryParams);
             }
             $this->info('[' . Carbon::now()->format('Y-m-d H:i:s') . '] Импорт завершен');
             return CommandAlias::SUCCESS;
@@ -548,7 +548,7 @@ class ImportByApiV1 extends Common
      * @param int $activityId
      * @return array
      */
-    #[ArrayShape(['email' => "mixed", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float"])]
+    #[ArrayShape(['email' => "string", 'mt_user_id' => "mixed", 'activity_id' => "int", 'date_time' => "string", 'duration' => "string", 'result' => "float", 'registered_at' => "mixed"])]
     private function prepareActionFcData(array $fcData, int $activityId): array
     {
         //По мероприятиям, если я правильно понимаю, то тут для каждого мероприятия есть started_at+finished_at, значит мы можем посчитать сколько мероприятие шло
@@ -565,9 +565,10 @@ class ImportByApiV1 extends Common
             'email' => strtolower($fcData['user']['email']),
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
-            'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),
+            'date_time' => $fcData['created_at'],
             'duration' => $this->formatDuration($totalWatchSeconds),
-            'result' => $this->calculateEventResult($totalWatchSeconds, $eventDuration)
+            'result' => $this->calculateEventResult($totalWatchSeconds, $eventDuration),
+            'registered_at' => $fcData['created_at']
         ];
     }
 

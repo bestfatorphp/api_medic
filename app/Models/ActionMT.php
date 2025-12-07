@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property float          $duration           Продолжительность
  * @property float          $result             Результат
  * @property string         $format             Формат регистрации на мероприятие
+ * @property Carbon         $registered_at      Дата и время регистрации на мероприятие
  *
  * @property UserMT         $user_mt
  * @property CommonDatabase $common_database
