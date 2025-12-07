@@ -565,10 +565,10 @@ class ImportByApiV1 extends Common
             'email' => strtolower($fcData['user']['email']),
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
-            'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),
+            'date_time' => !empty($fcData['created_at']) ? Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s') : '1970-01-01 00:00:00',
             'duration' => $this->formatDuration($totalWatchSeconds),
             'result' => $this->calculateEventResult($totalWatchSeconds, $eventDuration),
-            'registered_at' => $fcData['created_at']
+            'registered_at' => !empty($fcData['created_at']) ? $fcData['created_at'] : null
         ];
     }
 

@@ -178,7 +178,7 @@ class UpdateNewFieldActionsMt extends Common
             'email' => strtolower($fcData['user']['email']),
             'mt_user_id' => $fcData['user']['id'],
             'activity_id' => $activityId,
-            'date_time' => Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s'),
+            'date_time' => $fcData['created_at'] ? Carbon::parse($fcData['created_at'])->format('Y-m-d H:i:s') : '1970-01-01 00:00:00',
             'registered_at' => $fcData['created_at']
         ];
     }
@@ -193,6 +193,9 @@ class UpdateNewFieldActionsMt extends Common
         $this->info("Пакетная вставка - " . count($batchActions));
         $this->withTableLock('actions_mt', function () use ($batchActions) {
             foreach ($batchActions as $data) {
+                if (!$data['registered_at']) {
+                    continue;
+                }
                 ActionMT::query()
                     ->where('email', $data['email'])
                     ->where('mt_user_id', $data['mt_user_id'])
