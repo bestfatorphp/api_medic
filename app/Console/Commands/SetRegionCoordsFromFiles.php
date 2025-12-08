@@ -11,11 +11,11 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
-class SetRegionByCityAndRegionCoordsFromFiles extends Command
+class SetRegionCoordsFromFiles extends Command
 {
     use WriteLockTrait;
 
-    protected $signature = 'set:regions-by-city-and-region-coords';
+    protected $signature = 'set:region-coords';
 
 
     protected $description = 'Заполнение таблицы regions (разовая команда) из файла, в ограниченной памяти';
@@ -24,7 +24,7 @@ class SetRegionByCityAndRegionCoordsFromFiles extends Command
      * Пути к файлу по которомым расставляем данные
      * @var string
      */
-    private string $filePathRegionCoords = 'additional/region_coords.xlsx';
+    private string $filePathRegionCoords = 'additional/region_coords.csv';
 
     /**
      * Размер пакета
@@ -57,7 +57,7 @@ class SetRegionByCityAndRegionCoordsFromFiles extends Command
      * Заполняем таблицу регионов
      * @throws \Exception
      */
-    private function fillRegionsTable()
+    private function fillRegionsTable(): void
     {
         $this->info("Заполняем таблицу regions");
 
@@ -67,51 +67,55 @@ class SetRegionByCityAndRegionCoordsFromFiles extends Command
             throw new \Exception("Файл не найден: {$filePath}");
         }
 
-        $spreadsheet = IOFactory::load($filePath);
-        $worksheet = $spreadsheet->getActiveSheet();
-
         $batchSize = 500;
         $batch = [];
+        $rowCount = 0;
+        $processedCount = 0;
 
-        foreach ($worksheet->getRowIterator(2) as $row) {
-            $cellIterator = $row->getCellIterator();
-            $cellIterator->setIterateOnlyExistingCells(false);
+        if (($handle = fopen($filePath, 'r')) !== false) {
+            $delimiter = ';';
 
-            $cells = [];
-            foreach ($cellIterator as $cell) {
-                $cells[] = $cell->getValue();
-            }
+            $header = fgetcsv($handle, 0, $delimiter);
 
-            if (isset($cells[0]) && isset($cells[1])) {
-                $region = trim($cells[0]);
+            while (($data = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $rowCount++;
 
-                if ($region === 'region') {
+                $region = trim(mb_strtoupper($data[1]));
+                $coords = $data[2];
+
+                if ($region === 'region' || $region === 'регион') {
                     continue;
                 }
 
-                $coords = trim($cells[1]);
+                if (empty($region)) {
+                    continue;
+                }
 
                 $batch[] = [
                     'name' => $region,
                     'coords' => $coords
                 ];
+                $processedCount++;
+
+                if (count($batch) >= $batchSize) {
+                    $this->insertRegionsBatch($batch);
+                    $this->info("Пакетная вставка - {$batchSize} (всего обработано: {$rowCount})");
+                }
             }
 
-            if (count($batch) >= $batchSize) {
+            fclose($handle);
+
+            if (count($batch) > 0) {
                 $this->insertRegionsBatch($batch);
-                $this->info("Пакетная вставка - {$batchSize}");
+                $this->info("Финальная пакетная вставка - " . count($batch) . " (всего обработано: {$rowCount})");
             }
+        } else {
+            throw new \Exception("Не удалось открыть файл: {$filePath}");
         }
 
-        $countBatch = count($batch);
-
-        if ($countBatch > 0) {
-            $this->insertRegionsBatch($batch);
-            $this->info("Пакетная вставка - {$countBatch}");
-        }
-
-        $this->info("Таблица regions заполнены");
+        $this->info("Таблица regions заполнена. Всего строк в файле: {$rowCount}, обработано: {$processedCount}");
     }
+
 
     /**
      * Пакетная вставка
