@@ -184,7 +184,7 @@ class ImportOldRegisteredMTUsersFromFile extends Command
         DB::transaction(function () use (&$commonDbBatch, &$stats, &$EMAILS) {
             if (!empty($commonDbBatch)) {
                 //вставляем новые записи
-                $this->withTableLock('common_database', function () use ($commonDbBatch) {
+                $this->withTableLock('users_mt', function () use ($commonDbBatch) {
                     UserMT::upsertWithMutators($commonDbBatch, ['email'], [
                         'registration_date',
                     ], 'email');
