@@ -38,6 +38,7 @@ class ImportCampaignsSandSayDeliv extends Common
      * Execute the console command.
      *
      * @return int
+     * @throws \Exception
      */
     public function handle()
     {
@@ -67,7 +68,10 @@ class ImportCampaignsSandSayDeliv extends Common
             $notDelivered = 0;
             $isSent = 0;
 
+            $batchContacts = [];
+            $batchCommonDB = [];
             $batchParticipations = [];
+            $processedEmails = [];
 
             do {
                 $this->info("Собираю - $count");
@@ -89,16 +93,22 @@ class ImportCampaignsSandSayDeliv extends Common
                         ++$notDelivered;
                     }
 
-                    $email = $participation[0];
+                    $email = strtolower($participation[0]);
+                    $this->setDataPackages($processedEmails, $email, $result, $batchContacts, $batchCommonDB);
+
                     $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $sendsayKey, $participation[2]);
 
                     if (count($batchParticipations) % 500 == 0) {
                         $this->saveBatchDataParticipations($batchParticipations, $sendsayKey, $this->hasIsSent);
+                        $this->saveBatchData($batchContacts, $batchCommonDB);
+                        $processedEmails = [];
                     }
                 }
 
                 if (!empty($batchParticipations)) {
                     $this->saveBatchDataParticipations($batchParticipations, $sendsayKey, $this->hasIsSent);
+                    $this->saveBatchData($batchContacts, $batchCommonDB);
+                    $processedEmails = [];
                 }
 
                 $skip += $limit;

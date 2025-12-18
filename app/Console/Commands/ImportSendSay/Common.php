@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands\ImportSendSay;
 
+use App\Models\CommonDatabase;
+use App\Models\SendsayContact;
 use App\Models\SendsayIssue;
 use App\Models\SendsayParticipation;
 use App\Traits\WriteLockTrait;
@@ -37,10 +39,80 @@ class Common extends Command
     }
 
     /**
+     * @param array $processedEmails
+     * @param string $email
+     * @param string $result
+     * @param array $batchContacts
+     * @param array $batchCommonDB
+     * @return void
+     */
+    protected function setDataPackages(
+        array &$processedEmails,
+        string $email,
+        string $result,
+        array &$batchContacts,
+        array &$batchCommonDB
+    ): void
+    {
+        $availability = $result !== 'not delivered';
+        $email_status = $availability ? 'active' : 'blocked';
+
+        if (!in_array($email, $processedEmails)) {
+            $processedEmails[] = $email;
+
+            //подготавливаем общие данные
+            $batchCommonDB[] = [
+                'email' => $email,
+                'email_status' => $email_status
+            ];
+        }
+
+        $batchContacts[$email] = [
+            'email' => $email,
+            'email_status' => $email_status,
+            'email_availability' => $availability,
+        ];
+    }
+
+    /**
+     * Пакетная вставка
+     * @param array $batchContacts
+     * @param array $batchCommonDB
+     * @throws \Exception
+     */
+    protected function saveBatchData(array &$batchContacts, array &$batchCommonDB): void
+    {
+        if (!empty($batchContacts)) {
+            $this->withTableLock('sendsay_contacts', function () use ($batchContacts) {
+                SendsayContact::upsert(
+                    array_values($batchContacts),
+                    ['email'],
+                    ['email_status', 'email_availability']
+                );
+            });
+            $batchContacts = [];
+        }
+
+        if (!empty($batchCommonDB)) {
+            $this->withTableLock('common_database', function () use ($batchCommonDB) {
+                CommonDatabase::upsert(
+                    $batchCommonDB,
+                    ['email'],
+                    ['email_status']
+                );
+            });
+            $batchCommonDB = [];
+        }
+
+        gc_mem_caches(); //очищаем кэши памяти Zend Engine
+    }
+
+    /**
      * Пакетная вставка участий
      * @param array $batchParticipations
      * @param string $status
      * @param bool $withUpdate
+     * @throws \Exception
      */
     protected function saveBatchDataParticipations(array &$batchParticipations, string $status, bool $withUpdate = false): void
     {

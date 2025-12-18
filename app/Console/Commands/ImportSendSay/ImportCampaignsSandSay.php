@@ -95,20 +95,22 @@ class ImportCampaignsSandSay extends Common
     {
         try {
             $options = $this->validateOptions();
-            $issues = $this->getIssuesList();
-
-            if (empty($issues)) {
-                $this->info('Нет рассылок за указанный период');
-                return CommandAlias::SUCCESS;
-            }
+            $onlyDeliv = (bool)$this->option('onlyDeliv');
+            $limit = $options['limit'];
 
             $this->info("Сбор статистики с {$this->fromDate} по {$this->toDate}");
 
-            $progressBar = new ProgressBar($this->output, count($issues));
-            $progressBar->start();
+            if (!$onlyDeliv) {
+                $issues = $this->getIssuesList();
 
-            $onlyDeliv = (bool)$this->option('onlyDeliv');
-            $limit = $options['limit'];
+                if (empty($issues)) {
+                    $this->info('Нет рассылок за указанный период');
+                    return CommandAlias::SUCCESS;
+                }
+
+                $progressBar = new ProgressBar($this->output, count($issues));
+                $progressBar->start();
+            }
 
             if (!$onlyDeliv) {
                 foreach ($issues as $issue) {
@@ -131,9 +133,8 @@ class ImportCampaignsSandSay extends Common
             //собираем участия отдельно за дату от и до
             $this->processParticipations($limit);
 
-            $progressBar->finish();
-
             if (!$onlyDeliv) {
+                $progressBar->finish();
                 $this->newLine();
                 $this->info("Обновляем рассылки, данными по {$this->toDate}");
                 //обновляем данные
@@ -155,6 +156,7 @@ class ImportCampaignsSandSay extends Common
      *
      * @param array $issue Данные рассылки
      * @param int $limit Лимит записей для получения
+     * @throws \Exception
      */
     private function processIssue(array $issue, int $limit): void
     {
@@ -223,6 +225,7 @@ class ImportCampaignsSandSay extends Common
     /**
      * Получаем статистику по кликам, чтению и доставке писем
      * @param int $limit
+     * @throws \Exception
      */
     private function processParticipations(int $limit)
     {
@@ -238,6 +241,7 @@ class ImportCampaignsSandSay extends Common
      * @param string $status
      * @param int $limit
      * @param array $batchParticipations
+     * @throws \Exception
      */
     private function getParticipationsAndSave(string $status, int $limit, array &$batchParticipations)
     {
@@ -253,6 +257,10 @@ class ImportCampaignsSandSay extends Common
 
             $this->info("Дата от, для deliv.issue изменена на {$this->fromDate}");
         }
+
+        $batchContacts = [];
+        $batchCommonDB = [];
+        $processedEmails = [];
 
         do {
             $this->info("Собираю $status - $count");
@@ -275,55 +283,35 @@ class ImportCampaignsSandSay extends Common
                 }
 
                 $result = $statusesData[$status];
-                $email = $participation[0];
+                $email = strtolower($participation[0]);
                 $issueId = (int)$participation[1];
+
+                if ($status === 'deliv.issue') {
+                    $this->setDataPackages($processedEmails, $email, $result, $batchContacts, $batchCommonDB);
+                }
+
                 $batchParticipations[] = $this->prepareParticipationResult($issueId, $email, $result, $status, $participation[$status === 'click' ? 3 : 2]);
 
                 if (count($batchParticipations) % 100 == 0) {
-                    $this->saveBatchDataParticipations($batchParticipations, $status);
+                    $this->saveBatchDataParticipations($batchParticipations, $status, $status === 'deliv.issue');
+                    if ($status === 'deliv.issue') {
+                        $this->saveBatchData($batchContacts, $batchCommonDB);
+                        $processedEmails = [];
+                    }
                 }
             }
 
             if (!empty($batchParticipations)) {
-                $this->saveBatchDataParticipations($batchParticipations, $status);
+                $this->saveBatchDataParticipations($batchParticipations, $status, $status === 'deliv.issue');
+                if ($status === 'deliv.issue') {
+                    $this->saveBatchData($batchContacts, $batchCommonDB);
+                    $processedEmails = [];
+                }
             }
 
             $skip += $limit;
             ++$count;
         } while (!empty($participations));
-    }
-
-    /**
-     * Пакетная вставка
-     * @param array $batchContacts
-     * @param array $batchCommonDB
-     * @throws \Exception
-     */
-    private function saveBatchData(array &$batchContacts, array &$batchCommonDB): void
-    {
-        if (!empty($batchContacts)) {
-            $this->withTableLock('sendsay_contacts', function () use ($batchContacts) {
-                SendsayContact::upsert(
-                    array_values($batchContacts),
-                    ['email'],
-                    ['email_status', 'email_availability']
-                );
-            });
-            $batchContacts = [];
-        }
-
-        if (!empty($batchCommonDB)) {
-            $this->withTableLock('common_database', function () use ($batchCommonDB) {
-                CommonDatabase::upsert(
-                    $batchCommonDB,
-                    ['email'],
-                    ['email_status']
-                );
-            });
-            $batchCommonDB = [];
-        }
-
-        gc_mem_caches(); //очищаем кэши памяти Zend Engine
     }
 
     /**
@@ -512,7 +500,7 @@ class ImportCampaignsSandSay extends Common
     {
         //получать только обновленные в суточной команде
         $response = SendSay::issueList([
-            'from' => '2025-05-01',
+            'from' => Carbon::now()->subMonths(9)->format('Y-m-d'),
             'upto' => Carbon::now()->subDay()->format('Y-m-d')
         ]);
 
