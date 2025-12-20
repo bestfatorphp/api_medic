@@ -265,9 +265,9 @@ class CommonDatabase extends Model
      */
     public function setRegistrationDateAttribute($value)
     {
-//        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['registration_date'] ?? null)) {
+        if ($this->shouldUpdateFieldIfNull($value, $this->attributes['registration_date'] ?? null)) {
             $this->attributes['registration_date'] = Carbon::parse($value);
-//        }
+        }
     }
 
     /**

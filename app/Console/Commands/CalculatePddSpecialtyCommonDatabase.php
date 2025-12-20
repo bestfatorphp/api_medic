@@ -23,7 +23,7 @@ class CalculatePddSpecialtyCommonDatabase extends Command
                             {--fillTempTable : Только заполнить (без создания таблицы), временную таблицу из файла для расстановки verification_status.}';
 
 
-    protected $description = 'Расставновка PDD спецмальностей (разовая команда) из файла в common_database, в ограниченной памяти';
+    protected $description = 'Расставновка PDD спецмальностей из файла в common_database, в ограниченной памяти';
 
     /**
      * Путь к файлу по которому вычисляем статус верификации

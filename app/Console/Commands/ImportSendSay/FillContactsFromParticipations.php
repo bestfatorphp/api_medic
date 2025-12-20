@@ -57,7 +57,6 @@ class FillContactsFromParticipations extends Command
         $this->batchSize = (int)$this->option('batch-size');
         $this->insertBatchSize = (int)$this->option('insert-batch');
 
-        // Получаем параметры фильтрации
         $from = $this->option('from');
         $to = $this->option('to');
 
@@ -77,7 +76,6 @@ class FillContactsFromParticipations extends Command
             $this->info("Дата ДО: до текущего момента");
         }
 
-        // Обрабатываем данные
         $this->processParticipations($from, $to);
 
         $this->info("Обработка завершена успешно!");
@@ -142,7 +140,6 @@ class FillContactsFromParticipations extends Command
                 $availability = $result !== 'not delivered';
                 $emailStatus = $availability ? 'active' : 'blocked';
 
-                // Только если email еще не встречался в этой пачке
                 if (!isset($batchContacts[$email])) {
                     $batchContacts[$email] = [
                         'email' => $email,
