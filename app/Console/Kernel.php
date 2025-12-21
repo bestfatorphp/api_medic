@@ -70,17 +70,14 @@ class Kernel extends ConsoleKernel
             ->dailyAt('02:30')
             ->sendOutputTo(storage_path("{$commonPath}import-sendsay-stats-deliv.log"));
 
-        //todo: при первом запуске - "--createTempTableAndFill" (убрать при следующем запуске команды!!!)
-        //todo: если обновили файл - "--fillTempTable", после заполнения таблицы, убрать при следующем запуске команды!!!
        $schedule->command('calculate:pdd_specialty_common_db --createTempTableAndFill')
             ->fridays()
-            ->at('12:50')
+            ->at('04:00')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
-
-//        $schedule->command('import:sendsay-fill-contacts')
-//            ->dailyAt('07:00')
-//            ->sendOutputTo(storage_path("{$commonPath}import-sendsay-fill-contacts.log"));
+        $schedule->command('calculate:pdd_specialty_common_db --createTempTableAndFill')
+        ->dailyAt('12:55')
+            ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
         //Команды для битрикса больше не нужны, по ним всё собрано
 //       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
