@@ -75,10 +75,6 @@ class Kernel extends ConsoleKernel
             ->at('04:00')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
-        $schedule->command('calculate:pdd_specialty_common_db --createTempTableAndFill')
-        ->dailyAt('12:55')
-            ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
-
         //Команды для битрикса больше не нужны, по ним всё собрано
 //       $schedule->command('import:medtouch-helios --chunk=5 --timeout=120 --need-file=true')
 //            ->dailyAt('01:30')
