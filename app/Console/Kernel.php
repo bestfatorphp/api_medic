@@ -74,7 +74,7 @@ class Kernel extends ConsoleKernel
         //todo: если обновили файл - "--fillTempTable", после заполнения таблицы, убрать при следующем запуске команды!!!
        $schedule->command('calculate:pdd_specialty_common_db --createTempTableAndFill')
             ->fridays()
-            ->at('04:00')
+            ->at('12:50')
             ->sendOutputTo(storage_path("{$commonPath}calculate-pdd-specialty-common-db.log"));
 
 
